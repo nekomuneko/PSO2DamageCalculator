@@ -191,7 +191,6 @@ with col_main_class:
 with col_sub_class:
     if main_class in SUCCESSOR_MAIN_CLASSES:
         # 後継クラスの場合、サブクラスは選択不可
-        # UI消失を防ぐため、常にselectboxは表示し、無効化する
         st.selectbox(
             "サブクラス",
             options=["None"],
@@ -292,10 +291,10 @@ total_stats = get_calculated_stats()
 
 st.subheader("合計基本ステータス")
 
-# 現在適用されているロジックのみを表示
+# Raw String Literal (r"...") を使用してNameErrorを解消
 st.markdown("##### 適用されている基本ステータス計算ロジック")
-st.markdown(f"**HP:** $\text{floor}((\text{メイン基礎値} \times \text{種族補正}) + (\text{サブ基礎値} \times \text{種族補正} \times \text{0.2}) + \text{クラスブースト})$")
-st.markdown(f"**PP:** $\text{floor}((\text{メイン基礎値} \times \text{種族補正}) + \text{クラスブースト})$ **(サブクラス不参照)**")
+st.markdown(r"**HP:** $\text{floor}((\text{メイン基礎値} \times \text{種族補正}) + (\text{サブ基礎値} \times \text{種族補正} \times \text{0.2}) + \text{クラスブースト})$")
+st.markdown(r"**PP:** $\text{floor}((\text{メイン基礎値} \times \text{種族補正}) + \text{クラスブースト})$ **(サブクラス不参照)**")
 
 
 # ステータス表示を整頓
