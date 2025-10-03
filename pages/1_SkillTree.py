@@ -51,6 +51,11 @@ ALL_CLASSES = list(WIKI_MAIN_STATS.keys())
 UNAVAILABLE_SUBCLASSES = ["Hr"]
 SUCCESSOR_MAIN_CLASSES = ["Hr", "Ph", "Et", "Lu"]
 
+# --- 四捨五入関数 (X.5で繰り上げ) ---
+def custom_round(num):
+    """メインクラスの種族補正適用時に使用する、標準的な四捨五入（X.5で繰り上げ）"""
+    return int(num + 0.5)
+
 # --- セッションステートの初期化 ---
 # 前回の設定値を保持
 if 'main_class_select' not in st.session_state: st.session_state['main_class_select'] = "Gu" 
@@ -69,7 +74,7 @@ def get_calculated_stats():
     WIKIのクラス補正済み基礎値に、種族補正、マグ、サブクラス貢献度、クラスブーストを合算した基本ステータスを計算します。
     
     ロジックの順序:
-    1. メインクラス最終値 = Floor(WIKI_MAIN_STATS[メインクラス] * 種族補正)
+    1. メインクラス最終値 = ROUND(WIKI_MAIN_STATS[メインクラス] * 種族補正)
     2. サブクラス貢献度 = Floor(Floor(WIKI_MAIN_STATS[サブクラス] * 種族補正) * 0.2)
     3. 合計 = メインクラス最終値 + マグ + サブクラス貢献度 + クラスブースト
     """
@@ -92,9 +97,16 @@ def get_calculated_stats():
         
         # --- 1. メインクラスによるステータス計算 ---
         
-        # 1-1. 種族補正適用 (切り捨て)
+        # 1-1. 種族補正適用 (四捨五入)
+        # HPとPPは特別な計算ルールがあるため、HP/PPのみ切り捨てを維持し、他のATK/DEF/技量は四捨五入を適用
         race_multiplier = race_cor.get(stat_name, 1.0)
-        main_final_value = int(wiki_main_base_val * race_multiplier)
+        
+        if stat_name in ['HP', 'PP']:
+             # HPとPPは常に切り捨てを適用
+            main_final_value = int(wiki_main_base_val * race_multiplier)
+        else:
+            # ATK/DEF/技量は四捨五入を適用 (法防の1ポイントズレを解消)
+            main_final_value = custom_round(wiki_main_base_val * race_multiplier)
         
         total_value = main_final_value
 
@@ -136,7 +148,7 @@ def get_calculated_stats():
 # =================================================================
 
 st.title("📚 1. ステータス計算機 (WIKI基礎値採用版)")
-st.caption("※ 計算ロジックを、お客様から提供されたWIKIのメインクラス基礎値表を起点に修正しました。")
+st.caption("※ 法防のズレ解消のため、ATK/DEF/技量のメインクラス補正に四捨五入を適用しました。HP/PPは切り捨てを維持しています。")
 
 # =================================================================
 # 1. クラス構成 (クラス / サブクラス)
@@ -268,7 +280,7 @@ total_stats = get_calculated_stats()
 st.subheader("合計基本ステータス (最終理論値)")
 
 st.markdown(f"##### (WIKIクラス値 + 種族補正 + マグ + サブ貢献度 + クラスブースト)")
-st.caption(f"※ 計算は**全ステップで厳密に切り捨て ($\text{{INT}}$) を適用**しています。")
+st.caption(f"※ ATK/DEF/技量はメインクラス補正時のみ**四捨五入**、その他は**切り捨て**を適用しています。")
 
 # ステータス表示を整頓
 stat_pairs = [
