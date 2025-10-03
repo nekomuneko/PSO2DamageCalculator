@@ -3,7 +3,6 @@
 import streamlit as st
 import json
 import base64
-import os
 from pathlib import Path 
 
 st.set_page_config(layout="wide")
@@ -15,7 +14,6 @@ if 'sub_class_select' not in st.session_state:
     st.session_state['sub_class_select'] = "None"
 if 'skills_data' not in st.session_state:
     st.session_state['skills_data'] = {}
-# メインページで使用される他のセッションステートも初期化
 if 'gear_weapon_atk' not in st.session_state:
     st.session_state['gear_weapon_atk'] = 2000
 if 'enemy_def' not in st.session_state:
@@ -23,13 +21,13 @@ if 'enemy_def' not in st.session_state:
 # --------------------------------------------------
 
 # --- ファイルパスの基点を設定 (Streamlit Cloud対応) ---
-# スクリプトの親ディレクトリ（プロジェクトルート）を特定
 SCRIPT_DIR = Path(__file__).parent.resolve()
 PROJECT_ROOT = SCRIPT_DIR.parent.resolve() 
 # --------------------------------------------------------
 
 # -------------------------------------------------------------------
 # クラス名とファイル名のみの対応付け
+# NONE_IMAGE_FILENAMEの定義は削除しました
 # -------------------------------------------------------------------
 CLASS_IMAGES = {
     # 値はファイル名のみ
@@ -39,7 +37,6 @@ CLASS_IMAGES = {
     "Ph": "Ph.png", "Ra": "Ra.png", "Su": "Su.png",
     "Te": "Te.png"
 }
-NONE_IMAGE_FILENAME = "None.png" 
 # -------------------------------------------------------------------
 
 # --- 画像をバイトデータとして読み込むヘルパー関数 ---
@@ -80,12 +77,10 @@ with tab1:
         # バイトデータを取得
         image_to_display = get_image_bytes(image_filename)
             
-        # 取得に失敗した場合、ダミー画像を使用
-        if image_to_display is None:
-            image_to_display = get_image_bytes(NONE_IMAGE_FILENAME)
-            
-        # 🚨 最終修正点: output_format="PNG" を追加 
-        st.image(image_to_display, width=64, output_format="PNG")
+        # 画像データがある場合のみ表示
+        if image_to_display is not None:
+            st.image(image_to_display, width=64, output_format="PNG")
+        # else: 画像がない場合は何も表示しない（空白になる）
         
     with col_main_select:
         main_class = st.selectbox(
@@ -102,8 +97,8 @@ with tab1:
         
         col_sub_img, col_sub_select = st.columns([1, 4])
         with col_sub_img:
-            # 🚨 最終修正点: output_format="PNG" を追加
-            st.image(get_image_bytes(NONE_IMAGE_FILENAME), width=64, output_format="PNG")
+            # None のため、ここでは何も画像を表示しない
+            pass
         with col_sub_select:
             st.selectbox(
                 "サブクラス",
@@ -123,17 +118,15 @@ with tab1:
             selected_sub_class = st.session_state.get('sub_class_select', 'None')
             
             if selected_sub_class == "None":
-                 image_to_display = get_image_bytes(NONE_IMAGE_FILENAME)
+                 # None のため、ここでは何も画像を表示しない
+                 image_to_display = None
             else:
                  image_filename = CLASS_IMAGES.get(selected_sub_class)
                  image_to_display = get_image_bytes(image_filename)
             
-            # 取得に失敗した場合、ダミー画像を使用
-            if image_to_display is None:
-                image_to_display = get_image_bytes(NONE_IMAGE_FILENAME)
-                
-            # 🚨 最終修正点: output_format="PNG" を追加
-            st.image(image_to_display, width=64, output_format="PNG")
+            # 画像データがある場合のみ表示
+            if image_to_display is not None:
+                st.image(image_to_display, width=64, output_format="PNG")
 
         with col_sub_select:
             st.selectbox(
