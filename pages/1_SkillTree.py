@@ -4,10 +4,10 @@ import math
 st.set_page_config(layout="wide")
 
 # =================================================================
-# 1. 補正データ定義
+# 1. 補正データ定義 & 定数
 # =================================================================
 
-# --- Lv100メインクラス補正済み基礎値 ---
+# --- Lv100メインクラス補正済み基礎値 (データは変更なし) ---
 WIKI_BASE_STATS = {
     "Hu": {"HP": 764, "PP": 120, "打撃力": 580, "射撃力": 540, "法撃力": 451, "技量": 415, "打撃防御": 580, "射撃防御": 451, "法撃防御": 451},
     "Fi": {"HP": 655, "PP": 120, "打撃力": 580, "射撃力": 450, "法撃力": 540, "技量": 415, "打撃防御": 580, "射撃防御": 450, "法撃防御": 450},
@@ -42,10 +42,9 @@ CLASS_BOOST_BONUS = {
 }
 
 # =================================================================
-# 2. スキルデータ定義 (統合)
+# 2. スキルデータ定義 (省略なし)
 # =================================================================
 
-# クラス名 -> {スキル名: {"max_level": X, "description": "説明", "prereq": {"前提スキル名": 必須SP}}}
 ALL_SKILL_DATA = {
     "Hu": {
         "フューリースタンス": {"max_level": 10, "description": "打撃力と射撃力を上昇。", "prereq": None},
@@ -119,14 +118,19 @@ ALL_SKILL_DATA = {
 
 # -------------------------------------------------------------------
 
-# 定数
+# 定数と初期化
 MAG_STATS_FIELDS = ["打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
 STATS_FIELDS = ["HP", "PP", "打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
 ALL_CLASSES = list(WIKI_BASE_STATS.keys())
-UNAVAILABLE_SUBCLASSES = ["Hr", "Ph", "Et", "Lu"] # 後継クラスはサブクラスにできない
-SUCCESSOR_MAIN_CLASSES = ["Hr", "Ph", "Et", "Lu"]
+# Hrはサブクラスに設定できない (ゲーム仕様に基づき修正)
+UNAVAILABLE_SUBCLASSES = ["Hr"] 
+# 後継クラスがメインクラスの場合、サブクラスはNoneに固定される (ゲーム仕様)
+SUCCESSOR_MAIN_CLASSES = ["Hr", "Ph", "Et", "Lu"] 
 
-# --- 丸め関数定義 ---
+# ユーザー要望によりSPは114で固定
+FIXED_SP_PER_CLASS = 114
+
+# --- 丸め関数定義 (変更なし) ---
 def custom_floor(num):
     """攻撃力/技量, HP/PP最終結果, およびサブクラス貢献度 (攻撃力/技量) に使用する切り捨て (FLOOR)"""
     return math.floor(num)
@@ -135,9 +139,9 @@ def custom_round_half_up(num):
     """防御力に使用する四捨五入 (X.5で繰り上げ)"""
     return int(num + 0.5)
 
-# --- セッションステートの初期化 (ステータス計算機 + スキルツリー) ---
+# --- セッションステートの初期化 ---
 if 'main_class_select' not in st.session_state: st.session_state['main_class_select'] = "Gu" 
-if 'sub_class_select' not in st.session_state: st.session_state['sub_class_select'] = "Lu" 
+if 'sub_class_select' not in st.session_state: st.session_state['sub_class_select'] = "Ph" # デフォルトをPhに変更
 if 'race_select' not in st.session_state: st.session_state['race_select'] = "キャスト女" 
 if 'mag_stats' not in st.session_state: 
     st.session_state['mag_stats'] = {field: 200 if field == "射撃力" else 0 for field in MAG_STATS_FIELDS}
@@ -149,19 +153,18 @@ if 'all_sp_allocations' not in st.session_state:
         class_name: {skill: 0 for skill in skills.keys()}
         for class_name, skills in ALL_SKILL_DATA.items()
     }
-# 利用可能SPは共通
-if 'total_sp_available' not in st.session_state: st.session_state['total_sp_available'] = 70 
 
 # =================================================================
 # 3. 計算関数
 # =================================================================
 
+def update_mag_stats(field):
+    """マグのステータス入力値をセッションステートに反映する関数"""
+    # この関数はマグ設定のnumber_inputのon_changeに必要
+    st.session_state['mag_stats'][field] = st.session_state[f"mag_input_{field}"]
+
 def get_calculated_stats():
-    """
-    HP: サブクラス貢献度(0.2倍)あり。
-    PP: サブクラス貢献度なし。
-    その他: 標準ロジック (サブクラス貢献度0.2倍、途中丸めあり)。
-    """
+    """ステータス計算ロジック"""
     
     race = st.session_state['race_select']
     main_class = st.session_state['main_class_select']
@@ -170,7 +173,6 @@ def get_calculated_stats():
     race_cor = RACE_CORRECTIONS.get(race, {})
     mag_stats = st.session_state['mag_stats']
     
-    # クラスブーストボーナスを適用するかどうか
     CB_BONUS = CLASS_BOOST_BONUS if st.session_state['class_boost_enabled'] else {k: 0 for k in CLASS_BOOST_BONUS.keys()}
         
     calculated_stats = {}
@@ -178,37 +180,32 @@ def get_calculated_stats():
     for stat_name in STATS_FIELDS:
         wiki_main_base_val = WIKI_BASE_STATS.get(main_class, {}).get(stat_name, 0)
         race_multiplier = race_cor.get(stat_name, 1.0)
-        total_value = 0.0 # 浮動小数点計算用に初期化
+        total_value = 0.0
 
         
         if stat_name == 'HP':
-            # HP 計算ロジック
             main_contribution = wiki_main_base_val * race_multiplier
             total_value += main_contribution
             
-            # サブクラス貢献度 (HPのみサブクラスもHPに貢献すると仮定し、0.2倍)
+            # HPのサブクラス貢献度 (20%) はメインクラスの種別に関わらず適用される
             if sub_class_select != 'None':
                 wiki_sub_base_val = WIKI_BASE_STATS.get(sub_class_select, {}).get(stat_name, 0)
                 sub_contribution = (wiki_sub_base_val * race_multiplier) * 0.2
                 total_value += sub_contribution
             
             total_value += CB_BONUS.get(stat_name, 0)
-            
             calculated_stats[stat_name] = custom_floor(total_value)
             
         elif stat_name == 'PP':
-            # PP 計算ロジック (サブクラス不参照)
             main_contribution = wiki_main_base_val * race_multiplier
             total_value += main_contribution
             
+            # PPはサブクラスの影響を受けない
             total_value += CB_BONUS.get(stat_name, 0)
-            
             calculated_stats[stat_name] = custom_floor(total_value)
             
         else:
-            # 攻撃力/防御力/技量 計算 (標準ロジック: 途中丸めあり)
-
-            # 1. メインクラスによるステータス計算 (種族補正適用 + 途中丸め)
+            # 攻撃力・技量・防御力
             if stat_name in ["打撃力", "射撃力", "法撃力", "技量"]:
                 main_final_value = custom_floor(wiki_main_base_val * race_multiplier)
             elif stat_name in ["打撃防御", "射撃防御", "法撃防御"]:
@@ -216,35 +213,97 @@ def get_calculated_stats():
                 
             total_value = float(main_final_value)
 
-            # 2. マグボーナス加算
             if stat_name in MAG_STATS_FIELDS:
                 total_value += mag_stats.get(stat_name, 0)
             
-            # 3. サブクラス貢献度計算 (攻撃力/防御力/技量はサブ貢献 20% + 途中丸め)
+            # 攻撃力/防御力/技量のサブクラス貢献度 (20%) はメインクラスが後継クラスの場合は適用されない
             if sub_class_select != 'None' and main_class not in SUCCESSOR_MAIN_CLASSES:
                 wiki_sub_base_val = WIKI_BASE_STATS.get(sub_class_select, {}).get(stat_name, 0)
 
-                # 3-1. サブクラスの種族補正適用 (切り捨て)
-                sub_after_race = custom_floor(wiki_sub_base_val * race_multiplier)
+                # サブクラスの基礎値を種族補正し、20%切り捨て
+                if stat_name in ["打撃力", "射撃力", "法撃力", "技量"]:
+                     sub_after_race = custom_floor(wiki_sub_base_val * race_multiplier)
+                else: # 防御力
+                     sub_after_race = custom_round_half_up(wiki_sub_base_val * race_multiplier)
                 
-                # 3-2. サブクラス貢献度 20% 適用 (切り捨て)
                 sub_contribution = custom_floor(sub_after_race * 0.2)
                 
                 total_value += sub_contribution
 
-            # 4. クラスブースト増加分 (固定値)
             total_value += CB_BONUS.get(stat_name, 0)
             
             calculated_stats[stat_name] = int(total_value)
             
     return calculated_stats
 
+# --- スキル入力のロジック (変更なし) ---
+def update_allocation(class_name, skill_name):
+    """SP割り当てを更新する関数"""
+    input_key = f"level_input_{class_name}_{skill_name}"
+    if class_name in st.session_state['all_sp_allocations']:
+        st.session_state['all_sp_allocations'][class_name][skill_name] = st.session_state[input_key]
+
+# --- スキルツリー描画関数 (変更なし) ---
+def render_skill_tree(class_name, allocations):
+    """指定されたクラスのスキルツリーを描画する関数"""
+    current_skills = ALL_SKILL_DATA.get(class_name, {})
+    if not current_skills:
+        st.info("このクラスのスキルデータは現在準備されていません。")
+        return
+
+    # スキルを2列に分けて表示
+    skill_cols = st.columns(2)
+    skill_names = list(current_skills.keys())
+    half_point = (len(skill_names) + 1) // 2
+
+    for i, skill_name in enumerate(skill_names):
+        skill_info = current_skills[skill_name]
+        
+        col = skill_cols[0] if i < half_point else skill_cols[1]
+        
+        with col:
+            max_lvl = skill_info['max_level']
+            current_lvl = allocations.get(skill_name, 0)
+            
+            st.markdown(f"**{skill_name}** (Max Lvl: {max_lvl})")
+            st.caption(f"*{skill_info['description']}*")
+
+            st.number_input(
+                "Lv",
+                min_value=0,
+                max_value=max_lvl,
+                value=current_lvl,
+                step=1,
+                key=f"level_input_{class_name}_{skill_name}",
+                label_visibility="collapsed", 
+                on_change=update_allocation,
+                args=(class_name, skill_name,)
+            )
+            st.markdown("---")
+
+# --- リセット関数 (SP固定値114に対応) ---
+def reset_sp():
+    """メインクラスとサブクラスのSP割り当てをリセットする関数"""
+    main_class_name = st.session_state['main_class_select']
+    sub_class_name = st.session_state.get('sub_class_select')
+
+    # メインクラスのリセット
+    if main_class_name in st.session_state['all_sp_allocations']:
+        st.session_state['all_sp_allocations'][main_class_name] = {
+            skill: 0 for skill in ALL_SKILL_DATA.get(main_class_name, {}).keys()
+        }
+    
+    # サブクラスがNoneでない場合、サブクラスもリセット
+    if sub_class_name and sub_class_name != 'None' and sub_class_name in st.session_state['all_sp_allocations']:
+        st.session_state['all_sp_allocations'][sub_class_name] = {
+            skill: 0 for skill in ALL_SKILL_DATA.get(sub_class_name, {}).keys()
+        }
+    
 # =================================================================
 # Streamlit UI
 # =================================================================
 
 st.title("📚 PSO2 総合シミュレーター")
-st.markdown("このシミュレーターは、ステータス計算とスキルツリー配分を同時に行うことができます。")
 st.markdown("---")
 
 # =================================================================
@@ -264,7 +323,7 @@ with col_main_class:
 
 with col_sub_class:
     if main_class in SUCCESSOR_MAIN_CLASSES:
-        # 後継クラスの場合、サブクラスは選択不可
+        # メインクラスが後継クラスの場合、サブクラスは選択不可 (ゲーム仕様)
         st.selectbox(
             "サブクラス",
             options=["None"],
@@ -272,29 +331,28 @@ with col_sub_class:
             key="sub_class_select",
             disabled=True,
         )
+        # 内部状態を確実に 'None' に設定
         if st.session_state.get('sub_class_select') != "None": st.session_state['sub_class_select'] = "None" 
-        st.info(f"ℹ️ {main_class}は後継クラスのため、サブクラスはNone固定です。")
+        st.error(f"⚠️ {main_class}は後継クラスのため、サブクラスはNone固定です。")
     else:
-        # メインクラスと後継クラスを除くリスト
+        # メインクラスとHrを除くリスト
         sub_class_options_filtered = ["None"] + [c for c in ALL_CLASSES if c != main_class and c not in UNAVAILABLE_SUBCLASSES]
         st.selectbox(
             "サブクラス",
             options=sub_class_options_filtered,
             key="sub_class_select",
         )
-        # Hrが誤って選択された場合の処理（保険）
-        if st.session_state.get('sub_class_select') == "Hr":
-            st.warning("Hrはサブクラスに設定できません。Noneに戻します。")
-            st.session_state['sub_class_select'] = "None"
-            # st.rerun() # UIがフリーズしないよう、リランは避ける
-
+        
 current_sub_class = st.session_state.get('sub_class_select', 'None')
+if current_sub_class != 'None' and current_sub_class in UNAVAILABLE_SUBCLASSES:
+    # 選択肢から除外されるが、万が一のためにエラー表示 (今回はHrのみ)
+    st.error(f"後継クラスの {current_sub_class} はサブクラスに設定できません。")
 
 
 st.markdown("---")
 
 # =================================================================
-# 2. 種族設定 & 3. マグ/ボーナス設定 (既存ロジック)
+# 2. 種族設定 & 3. マグ/ボーナス設定
 # =================================================================
 
 # --- 2. 種族設定 ---
@@ -316,32 +374,31 @@ st.markdown("### 3. マグ/ボーナス設定")
 st.markdown("##### マグのステータス (合計 **200** まで)")
 current_total_mag = sum(st.session_state['mag_stats'].values())
 MAG_MAX_TOTAL = 200
-st.caption(f"**合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**") # captionで文字を小さく
+st.caption(f"**合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**")
 
 if current_total_mag > MAG_MAX_TOTAL:
     st.error(f"マグの合計値が上限の {MAG_MAX_TOTAL} を超えています！")
 elif current_total_mag == MAG_MAX_TOTAL:
     st.success("マグの合計値が上限に達しました。", icon="✅")
 
-# 3列に分けたマグ入力フィールド
 mag_cols = st.columns(3) 
 mag_fields_groups = [["打撃力", "射撃力", "法撃力"], ["打撃防御", "射撃防御", "法撃防御"], ["技量"]]
-
-def update_mag_stats(field):
-    st.session_state['mag_stats'][field] = st.session_state[f"mag_input_{field}"]
 
 for col_idx, fields in enumerate(mag_fields_groups):
     with mag_cols[col_idx]:
         for field in fields:
+            # マグのステータスは、対応するフィールドにしか振れないため、最大値を200に設定
+            max_val = MAG_MAX_TOTAL if field in ["打撃力", "射撃力", "法撃力", "技量"] else 0 # 攻撃系ステータスにのみ振れる仕様を反映
+            
             st.markdown(f"**{field}**", help=f"{field}のマグレベル")
             st.number_input(
                 field,
                 min_value=0,
-                max_value=MAG_MAX_TOTAL, 
+                max_value=max_val, 
                 key=f"mag_input_{field}",
                 value=st.session_state['mag_stats'].get(field, 0),
                 step=1,
-                label_visibility="collapsed", # ラベルを非表示
+                label_visibility="collapsed",
                 on_change=update_mag_stats,
                 args=(field,)
             )
@@ -355,26 +412,22 @@ st.checkbox(
     help="HP+60, PP+10, 攻撃力+120, 技量+60, 防御力+90が加算されます。"
 )
 
-
 st.markdown("---")
 
 # =================================================================
 # 4. 合計基本ステータス表示 (計算結果表示)
 # =================================================================
 
-# 補正込みの合計値を計算
 total_stats = get_calculated_stats()
 
 st.markdown("### 4. 合計基本ステータス")
 st.markdown(f"現在の構成: **{main_class} / {current_sub_class}**")
 
-# 計算ロジックのタイトルをさらに小さく
 st.markdown("###### 適用されている基本ステータス計算ロジック")
 st.markdown(r"**HP:** $\text{floor}((\text{メイン基礎値} \times \text{種族補正}) + (\text{サブ基礎値} \times \text{種族補正} \times \text{0.2}) + \text{クラスブースト})$")
 st.markdown(r"**PP:** $\text{floor}((\text{メイン基礎値} \times \text{種族補正}) + \text{クラスブースト})$ **(サブクラス不参照)**")
 
 
-# ステータス表示を整頓
 stat_pairs = [
     ("HP", "PP"),      
     ("打撃力", "打撃防御"),
@@ -396,129 +449,61 @@ for stat1_name, stat2_name in stat_pairs:
 st.markdown("---")
 
 # =================================================================
-# 5. スキルツリーシミュレーター (新規統合)
+# 5. スキルツリーシミュレーター (SP分離・固定化に伴い修正)
 # =================================================================
 
 st.markdown("### 5. スキルツリーシミュレーター")
-st.markdown("上記で設定したメイン/サブクラスのスキルツリーに、利用可能 $\text{SP}$ を割り振ります。")
+st.markdown("各クラスのスキルポイントは**114ポイントで固定**されています。")
 
-
-# --- SP計算とサマリー ---
+# --- SP計算とサマリー (メインとサブを分離) ---
 
 main_allocations = st.session_state['all_sp_allocations'].get(main_class, {})
 sub_class_name_key = current_sub_class
 sub_allocations = st.session_state['all_sp_allocations'].get(sub_class_name_key, {})
 
+# メインクラスSP
+main_sp_spent = sum(main_allocations.values())
+main_sp_remaining = FIXED_SP_PER_CLASS - main_sp_spent
 
-total_sp_spent = sum(main_allocations.values())
-if sub_class_name_key != 'None':
-    total_sp_spent += sum(sub_allocations.values()) # サブクラスのSPを加算
+# サブクラスSP
+sub_sp_spent = sum(sub_allocations.values()) if sub_class_name_key != 'None' else 0
+sub_sp_remaining = FIXED_SP_PER_CLASS - sub_sp_spent if sub_class_name_key != 'None' else 0
 
-total_sp_available = st.session_state['total_sp_available']
-remaining_sp = total_sp_available - total_sp_spent
+col_main_sp, col_sub_sp = st.columns(2)
 
-col_sp_input, col_sp_summary, col_sp_remaining = st.columns(3)
-
-with col_sp_input:
-    st.number_input(
-        "利用可能な合計SP",
-        min_value=1,
-        max_value=150, 
-        value=total_sp_available,
-        step=1,
-        key='total_sp_available',
-        label_visibility="visible"
-    )
-
-with col_sp_summary:
+with col_main_sp:
+    st.markdown(f"#### メインクラス SP (合計: {FIXED_SP_PER_CLASS})")
     st.metric(
-        label="使用済み SP (合計)",
-        value=f"{total_sp_spent} ポイント",
-        delta_color="off" 
+        label=f"**{main_class}** 使用済み / 残り SP",
+        value=f"{main_sp_spent} / {main_sp_remaining}",
+        delta=f"残り {main_sp_remaining}" if main_sp_remaining >= 0 else f"超過 {abs(main_sp_remaining)}",
+        delta_color="inverse" if main_sp_remaining >= 0 else "normal"
     )
+    if main_sp_remaining < 0:
+        st.error(f"メインSPが {abs(main_sp_remaining)} ポイント超過しています！")
 
-with col_sp_remaining:
-    delta_value = None
-    delta_color = "off"
-    if remaining_sp > 0:
-        delta_value = f"残り {remaining_sp}"
-        delta_color = "inverse"
-    elif remaining_sp < 0:
-        delta_value = f"超過 {abs(remaining_sp)}"
-        delta_color = "normal" 
 
-    st.metric(
-        label="SP ステータス",
-        value=f"{remaining_sp} ポイント",
-        delta=delta_value,
-        delta_color=delta_color 
-    )
-
-if remaining_sp < 0:
-    st.error(f"合計SP ({total_sp_available}) を {abs(remaining_sp)} ポイント超過しています！")
-elif remaining_sp == 0:
-    st.success("スキルポイントを使い切りました！")
-
+with col_sub_sp:
+    if sub_class_name_key != 'None':
+        st.markdown(f"#### サブクラス SP (合計: {FIXED_SP_PER_CLASS})")
+        st.metric(
+            label=f"**{sub_class_name_key}** 使用済み / 残り SP",
+            value=f"{sub_sp_spent} / {sub_sp_remaining}",
+            delta=f"残り {sub_sp_remaining}" if sub_sp_remaining >= 0 else f"超過 {abs(sub_sp_remaining)}",
+            delta_color="inverse" if sub_sp_remaining >= 0 else "normal"
+        )
+        if sub_sp_remaining < 0:
+            st.error(f"サブSPが {abs(sub_sp_remaining)} ポイント超過しています！")
+    else:
+        st.markdown("#### サブクラス SP")
+        st.info("サブクラスが設定されていません。")
 
 st.markdown("---")
 
-# --- スキル入力のロジック ---
-def update_allocation(class_name, skill_name):
-    # キーにクラス名とスキル名を含めることで、どのインプットが変更されたかを正確に特定
-    input_key = f"level_input_{class_name}_{skill_name}"
-    # 選択されたクラスの割り当てを更新
-    if class_name in st.session_state['all_sp_allocations']:
-        st.session_state['all_sp_allocations'][class_name][skill_name] = st.session_state[input_key]
+# --- タブ表示 (タブ名に残SPを表示) ---
 
-
-# --- スキルツリー描画関数 ---
-def render_skill_tree(class_name, allocations):
-    current_skills = ALL_SKILL_DATA.get(class_name, {})
-    if not current_skills:
-        st.info("このクラスのスキルデータは現在準備されていません。")
-        return
-
-    # スキルを2列に分けて表示
-    skill_cols = st.columns(2)
-    skill_names = list(current_skills.keys())
-    half_point = (len(skill_names) + 1) // 2
-
-    for i, skill_name in enumerate(skill_names):
-        skill_info = current_skills[skill_name]
-        
-        col = skill_cols[0] if i < half_point else skill_cols[1]
-        
-        with col:
-            max_lvl = skill_info['max_level']
-            current_lvl = allocations.get(skill_name, 0)
-            
-            # スキル名と説明をコンパクトに表示
-            st.markdown(f"**{skill_name}** (Max Lvl: {max_lvl})")
-            st.caption(f"*{skill_info['description']}*")
-
-            # ナンバーインプットを使用。キーにクラス名とスキル名を追加
-            st.number_input(
-                "Lv",
-                min_value=0,
-                max_value=max_lvl,
-                value=current_lvl,
-                step=1,
-                key=f"level_input_{class_name}_{skill_name}",
-                label_visibility="collapsed", 
-                on_change=update_allocation,
-                args=(class_name, skill_name,)
-            )
-            st.markdown("---")
-
-
-# --- タブ表示 ---
-
-# メインクラスのタブ名
-main_tab_title = f"メイン: {main_class} ({sum(main_allocations.values())} SP)"
-
-# サブクラスのタブ名と条件
-sub_tab_enabled = sub_class_name_key != 'None'
-sub_tab_title = f"サブ: {sub_class_name_key} ({sum(sub_allocations.values())} SP)" if sub_tab_enabled else "サブクラス (None)"
+main_tab_title = f"メイン: {main_class} (残 {main_sp_remaining})"
+sub_tab_title = f"サブ: {sub_class_name_key} (残 {sub_sp_remaining})" if current_sub_class != 'None' else "サブクラス (None)"
 
 
 tab_main, tab_sub = st.tabs([main_tab_title, sub_tab_title])
@@ -530,31 +515,12 @@ with tab_main:
 
 # --- サブクラスのタブ内容 ---
 with tab_sub:
-    if sub_tab_enabled:
+    if sub_class_name_key != 'None':
         st.markdown(f"#### {sub_class_name_key} スキルポイント配分")
         render_skill_tree(sub_class_name_key, sub_allocations)
     else:
-        st.info("サブクラスが設定されていないため、スキルツリーは表示されません。")
+        st.info("サブクラスがNoneのため、スキルツリーは表示されません。")
 
 
 # --- リセットボタン ---
-def reset_sp():
-    main_class_name = st.session_state['main_class_select']
-    sub_class_name = st.session_state.get('sub_class_select')
-
-    # メインクラスのリセット
-    if main_class_name in st.session_state['all_sp_allocations']:
-        st.session_state['all_sp_allocations'][main_class_name] = {
-            skill: 0 for skill in ALL_SKILL_DATA.get(main_class_name, {}).keys()
-        }
-    
-    # サブクラスがNoneでない場合、サブクラスもリセット
-    if sub_class_name and sub_class_name != 'None' and sub_class_name in st.session_state['all_sp_allocations']:
-        st.session_state['all_sp_allocations'][sub_class_name] = {
-            skill: 0 for skill in ALL_SKILL_DATA.get(sub_class_name, {}).keys()
-        }
-    
-    # 利用可能SPはデフォルト値に戻す
-    st.session_state['total_sp_available'] = 70 
-
 st.button(f"🔄 現在の構成 ({main_class}/{current_sub_class}) のSPを全てリセット", on_click=reset_sp)
