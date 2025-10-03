@@ -20,10 +20,11 @@ if 'enemy_def' not in st.session_state:
 # --------------------------------------------------
 
 # -------------------------------------------------------------------
-# クラス定義 (画像関連のコードはすべて削除されました)
+# クラス定義 (ご要望の並び順に修正しました)
+# Hu, FI, Ra, Gu, Fo, Te, Br, Bo, Su, Hr, Ph, Et, Lu
 # -------------------------------------------------------------------
-ALL_CLASSES = ["Bo", "Br", "Et", "Fi", "Fo", "Gu", "Hr", "Hu", "Lu", "Ph", "Ra", "Su", "Te"]
-SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
+ALL_CLASSES = ["Hu", "Fi", "Ra", "Gu", "Fo", "Te", "Br", "Bo", "Su", "Hr", "Ph", "Et", "Lu"]
+SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"] # サブクラス候補はHrを除く
 # -------------------------------------------------------------------
 
 st.title("📚 1. Skill Tree 設定")
@@ -36,6 +37,7 @@ with tab1:
     
     # --- クラス選択エリア ---
     
+    # 選択肢はALL_CLASSESの新しい順序に従います
     main_class = st.selectbox(
         "メインクラス",
         options=ALL_CLASSES,
@@ -56,6 +58,7 @@ with tab1:
         )
         st.session_state['sub_class_select'] = "None" 
     else:
+        # サブクラス候補はメインクラスを除いたもの + "None"
         sub_class_options_filtered = ["None"] + [c for c in SUB_CLASSES_CANDIDATES if c != main_class]
 
         st.selectbox(
