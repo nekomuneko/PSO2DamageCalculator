@@ -5,7 +5,7 @@ import math
 st.set_page_config(layout="wide")
 
 # =================================================================
-# 1. 補正データ定義 (新しい基礎値を適用)
+# 1. 補正データ定義 (確定版基礎値と補正率)
 # =================================================================
 
 # --- プレイヤー基礎ステータス (LV100固定値として設定) ---
@@ -35,6 +35,7 @@ RACE_CORRECTIONS = {
 
 # --- クラス補正データ (乗算補正) ---
 CLASS_CORRECTIONS = {
+    # 旧クラス
     "Hu": {"HP": 1.18, "PP": 1.00, "打撃力": 1.07, "射撃力": 1.00, "法撃力": 0.83, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, 
     "Fi": {"HP": 1.01, "PP": 1.00, "打撃力": 1.07, "射撃力": 0.83, "法撃力": 1.00, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, 
     "Ra": {"HP": 0.99, "PP": 1.00, "打撃力": 1.00, "射撃力": 1.07, "法撃力": 0.83, "技量": 1.00, "打撃防御": 1.00, "射撃防御": 1.29, "法撃防御": 1.00}, 
@@ -61,8 +62,13 @@ CLASS_BOOST_BONUS = {
 MAG_STATS_FIELDS = ["打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
 ALL_CLASSES = ["Hu", "Fi", "Ra", "Gu", "Fo", "Te", "Br", "Bo", "Su", "Hr", "Ph", "Et", "Lu"]
 
+# 【重要】サブクラスとして選択できないクラス (Hrのみ)
+UNAVAILABLE_SUBCLASSES = ["Hr"]
+# 【重要】メインクラスに設定した場合、サブクラスが強制的にNoneになるクラス
+SUCCESSOR_MAIN_CLASSES = ["Hr", "Ph", "Et", "Lu"]
+
 # --- セッションステートの初期化 ---
-if 'main_class_select' not in st.session_state: st.session_state['main_class_select'] = "Br" 
+if 'main_class_select' not in st.session_state: st.session_state['main_class_select'] = "Hu" 
 if 'sub_class_select' not in st.session_state: st.session_state['sub_class_select'] = "None"
 if 'skills_data' not in st.session_state: st.session_state['skills_data'] = {}
 if 'race_select' not in st.session_state: st.session_state['race_select'] = "ヒューマン男"
@@ -71,13 +77,18 @@ if 'mag_stats' not in st.session_state:
 if 'class_boost_enabled' not in st.session_state: st.session_state['class_boost_enabled'] = True 
 
 # =================================================================
-# 2. 計算関数 (ロジック再構築 - 全ステップ切り捨て適用)
+# 2. 計算関数 (確定ロジック: 全ステップ切り捨て適用)
 # =================================================================
 
 def get_calculated_stats():
     """
     LV100基礎ステータスを起点に、種族、クラス、マグ、クラスブーストを合算した基本ステータスを計算します。
     【確定ロジック】すべての乗算補正ステップで「切り捨て (INT / FLOOR)」を適用します。
+    
+    ロジックの順序:
+    1. メインクラス最終値 = Floor(Floor(基礎値 * メインクラス補正) * 種族補正)
+    2. サブクラス貢献度 = Floor(Floor(Floor(基礎値 * サブクラス補正) * 種族補正) * 0.2)
+    3. 合計 = メインクラス最終値 + マグ + サブクラス貢献度 + クラスブースト
     """
     
     # 選択されている設定の取得
@@ -96,7 +107,7 @@ def get_calculated_stats():
     calculated_stats = {}
 
     for stat_name, base_val in NEW_BASE_STATS.items():
-        # --- 1. メインクラスによるステータス計算 ---
+        # --- 1. メインクラスによるステータス計算 (HP/PP含む) ---
         
         # 1-1. メインクラス補正適用 (切り捨て)
         main_class_multiplier = main_class_cor.get(stat_name, 1.0)
@@ -108,7 +119,7 @@ def get_calculated_stats():
         
         total_value = main_final_value
 
-        # --- 2. サブクラス貢献度 (ATK/DEF/ACC/技量のみ) ---
+        # --- 2. サブクラス貢献度 & マグ (ATK/DEF/ACC/技量のみ) ---
         
         # HP/PPにはサブクラス、マグの寄与は無い
         if stat_name not in ['HP', 'PP']:
@@ -119,18 +130,21 @@ def get_calculated_stats():
             
             sub_contribution = 0
             
-            # サブクラスが設定されている場合
+            # サブクラスが設定されており、かつメインクラスが後継クラスではない場合
+            # メインクラスが後継クラスの場合、sub_class_selectは強制的に'None'になるため、このチェックは不要だが、念のため。
             if sub_class_select != 'None':
                 sub_cor = CLASS_CORRECTIONS.get(sub_class_select, {})
                 sub_class_multiplier = sub_cor.get(stat_name, 1.0)
 
                 # 2-1. サブクラス補正適用 (切り捨て)
+                # 基礎値から計算を始める
                 sub_after_class = int(base_val * sub_class_multiplier)
 
                 # 2-2. 種族補正適用 (切り捨て)
                 sub_after_race = int(sub_after_class * race_multiplier)
                 
                 # 2-3. サブクラス貢献度 20% 適用 (切り捨て)
+                # 確定ロジック: 最終補正の0.2倍にも切り捨てを適用する
                 sub_contribution = int(sub_after_race * 0.2)
                 
                 total_value += sub_contribution
@@ -166,8 +180,8 @@ with col_main_class:
 
 with col_sub_class:
     # --- サブクラスのオプションロジック ---
-    if main_class in ["Hr", "Ph", "Et", "Lu"]:
-        # メインクラスが後継クラスの場合、サブクラスは "None" 固定
+    if main_class in SUCCESSOR_MAIN_CLASSES:
+        # メインクラスが後継クラス (Hr, Ph, Et, Lu) の場合、サブクラスは "None" 固定
         st.selectbox(
             "サブクラス",
             options=["None"],
@@ -175,26 +189,31 @@ with col_sub_class:
             key="sub_class_select",
             disabled=True,
         )
-        # 【修正: StreamlitAPIException回避】
-        # disabledなselectboxは自動的にNoneに設定されるため、この行は削除する。
-        # st.session_state['sub_class_select'] = "None" 
-        
-        # ただし、メインクラス変更時に状態が残ることを防ぐため、明示的にNoneに設定する（ただしselectboxの描画ロジックの外で）
+        # 状態を強制的に"None"に設定
         if st.session_state.get('sub_class_select') != "None":
             st.session_state['sub_class_select'] = "None" 
 
         st.info(f"{main_class}は後継クラスのため、サブクラスはNone固定です。", icon="ℹ️")
     else:
-        # 【修正: サブクラス選択肢】
-        # メインクラスが旧クラスの場合、後継クラスも含めた「メインクラス自身を除く全て」がサブクラスとして選択可能
-        # ALL_CLASSESからメインクラス自身だけを除外
-        sub_class_options_filtered = ["None"] + [c for c in ALL_CLASSES if c != main_class]
+        # メインクラスが旧クラスの場合
+        # サブクラスの選択肢からメインクラス自身と【Hrのみ】を除外する
+        sub_class_options_filtered = ["None"] + [
+            c for c in ALL_CLASSES 
+            if c != main_class and c not in UNAVAILABLE_SUBCLASSES # Hrは選択肢から除外
+        ]
 
         st.selectbox(
             "サブクラス",
             options=sub_class_options_filtered,
             key="sub_class_select",
         )
+        
+        # 選択されたサブクラスがHrだった場合（過去のセッションステート等で残っていた場合）
+        if st.session_state.get('sub_class_select') == "Hr":
+            st.warning("Hrはサブクラスに設定できません。Noneに戻します。")
+            st.session_state['sub_class_select'] = "None"
+            st.rerun()
+
 
 st.markdown("---")
 
@@ -343,7 +362,7 @@ export_data = {
     "race": st.session_state['race_select'],
     "mag_stats": st.session_state['mag_stats'], 
     "class_boost_enabled": st.session_state['class_boost_enabled'],
-    "version": "pso2_dmg_calc_v13_fixed" # バージョン名を更新
+    "version": "pso2_dmg_calc_v15_hr_sub_fix" # バージョン名を更新
 }
 
 export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
@@ -417,4 +436,3 @@ if skill_tabs_list:
             st.write(f"現在、**{class_name}** のスキルツリー設定を表示しています。")
             st.info("ここにスキル名とレベル入力（スライダーまたは数値入力）のUIが入り、そのスキル効果が上記の基本ステータスやダメージ計算に反映されます。（未実装）")
 else:
-    st.warning("クラスが選択されていません。")
