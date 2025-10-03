@@ -1,20 +1,3 @@
-承知いたしました。度重なるエラーにもかかわらず、最新の情報を共有していただき感謝します。
-
-AttributeError（Pillow画像のフォーマット属性エラー）を解決するため、前回のコードに**output_format="PNG"** を追加した、最終修正版の pages/1_SkillTree.py 全体を再度書き直して提示します。
-
-このコードは、画像読み込みエラーを完全に回避するために、以下の対策をすべて施しています。
-
-KeyError対策: セッションステートの初期化。
-
-MediaFileStorageError対策: pathlib を使った絶対パスでのバイトデータ読み込み。
-
-AttributeError対策: st.image() に output_format="PNG" を明示的に指定。
-
-💻 最終決定版: pages/1_SkillTree.py
-このコードを現在の pages/1_SkillTree.py の内容と完全に置き換えてください。
-
-Python
-
 # pages/1_SkillTree.py
 
 import streamlit as st
@@ -202,4 +185,5 @@ with tab1:
 with tab2:
     st.subheader("スキルツリー詳細設定")
     st.write("スキル配分などの詳細設定をここに追加します。")
+
 
