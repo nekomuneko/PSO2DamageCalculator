@@ -31,7 +31,7 @@ CLASS_IMAGES = {
     "Fi": "images/Fi.png", "Fo": "images/Fo.png", "Gu": "images/Gu.png",
     "Hr": "images/Hr.png", "Hu": "images/Hu.png", "Lu": "images/Lu.png",
     "Ph": "images/Ph.png", "Ra": "images/Ra.png", "Su": "images/Su.png",
-    "Te": "images/Te.png",
+    "Te": "images/Te.png"
 }
 # Noneが選択された時、および画像が見つからない時のフォールバックパス
 NONE_IMAGE_PATH = "images/None.png" 
@@ -156,3 +156,4 @@ with tab1:
 with tab2:
     st.subheader("スキルツリー詳細設定")
     st.write("スキル配分などの詳細設定をここに追加します。")
+
