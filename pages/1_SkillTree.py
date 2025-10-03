@@ -9,7 +9,6 @@ st.set_page_config(layout="wide")
 # =================================================================
 
 # --- プレイヤー基礎ステータス (LV100固定値として設定) ---
-# ユーザー様のご指摘に基づき、新しい基礎値を適用します。
 NEW_BASE_STATS = {
     "HP": 650,
     "PP": 120,
@@ -23,7 +22,6 @@ NEW_BASE_STATS = {
 }
 
 # --- 種族補正データ (乗算補正: 1.05 = +5%, 0.95 = -5%) ---
-# この倍率はPSO2のデータベース値を使用し、変更なし
 RACE_CORRECTIONS = {
     "ヒューマン男": {"HP": 1.05, "PP": 1.00, "打撃力": 1.04, "射撃力": 1.03, "法撃力": 1.00, "技量": 1.05, "打撃防御": 1.05, "射撃防御": 1.00, "法撃防御": 1.00},
     "ヒューマン女": {"HP": 1.04, "PP": 1.00, "打撃力": 1.00, "射撃力": 1.03, "法撃力": 1.04, "技量": 1.06, "打撃防御": 1.00, "射撃防御": 1.00, "法撃防御": 1.05},
@@ -36,7 +34,6 @@ RACE_CORRECTIONS = {
 }
 
 # --- クラス補正データ (乗算補正) ---
-# この倍率もPSO2のデータベース値を使用し、変更なし
 CLASS_CORRECTIONS = {
     "Hu": {"HP": 1.18, "PP": 1.00, "打撃力": 1.07, "射撃力": 1.00, "法撃力": 0.83, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, 
     "Fi": {"HP": 1.01, "PP": 1.00, "打撃力": 1.07, "射撃力": 0.83, "法撃力": 1.00, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, 
@@ -170,6 +167,7 @@ with col_main_class:
 with col_sub_class:
     # --- サブクラスのオプションロジック ---
     if main_class in ["Hr", "Ph", "Et", "Lu"]:
+        # メインクラスが後継クラスの場合、サブクラスは "None" 固定
         st.selectbox(
             "サブクラス",
             options=["None"],
@@ -177,11 +175,20 @@ with col_sub_class:
             key="sub_class_select",
             disabled=True,
         )
-        st.session_state['sub_class_select'] = "None" 
+        # 【修正: StreamlitAPIException回避】
+        # disabledなselectboxは自動的にNoneに設定されるため、この行は削除する。
+        # st.session_state['sub_class_select'] = "None" 
+        
+        # ただし、メインクラス変更時に状態が残ることを防ぐため、明示的にNoneに設定する（ただしselectboxの描画ロジックの外で）
+        if st.session_state.get('sub_class_select') != "None":
+            st.session_state['sub_class_select'] = "None" 
+
         st.info(f"{main_class}は後継クラスのため、サブクラスはNone固定です。", icon="ℹ️")
     else:
-        # メインクラスと後継クラスを除くサブクラス候補
-        sub_class_options_filtered = ["None"] + [c for c in ALL_CLASSES if c != "Hr" and c != "Ph" and c != "Et" and c != "Lu" and c != main_class]
+        # 【修正: サブクラス選択肢】
+        # メインクラスが旧クラスの場合、後継クラスも含めた「メインクラス自身を除く全て」がサブクラスとして選択可能
+        # ALL_CLASSESからメインクラス自身だけを除外
+        sub_class_options_filtered = ["None"] + [c for c in ALL_CLASSES if c != main_class]
 
         st.selectbox(
             "サブクラス",
@@ -336,7 +343,7 @@ export_data = {
     "race": st.session_state['race_select'],
     "mag_stats": st.session_state['mag_stats'], 
     "class_boost_enabled": st.session_state['class_boost_enabled'],
-    "version": "pso2_dmg_calc_v12_fixed_base_stats" # バージョン名を更新
+    "version": "pso2_dmg_calc_v13_fixed" # バージョン名を更新
 }
 
 export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
@@ -361,7 +368,6 @@ if uploaded_file is not None:
         
         if "main_class" in data and "sub_class" in data and "skills" in data:
             st.session_state['main_class_select'] = data["main_class"]
-            # 🚨 修正箇所: ここで引用符を修正しました ('] -> ')
             st.session_state['sub_class_select'] = data["sub_class"]
             st.session_state['skills_data'] = data["skills"]
             
