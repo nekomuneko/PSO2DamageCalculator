@@ -4,11 +4,10 @@ import math
 st.set_page_config(layout="wide")
 
 # =================================================================
-# 1. 補正データ定義 (お客様の命令に基づきWIKI値とロジックを適用)
+# 1. 補正データ定義
 # =================================================================
 
 # --- Lv100メインクラス補正済み基礎値 ---
-# GuのHP基礎値はWIKI値「650」に戻してあります。
 WIKI_BASE_STATS = {
     "Hu": {"HP": 764, "PP": 120, "打撃力": 580, "射撃力": 540, "法撃力": 451, "技量": 415, "打撃防御": 580, "射撃防御": 451, "法撃防御": 451},
     "Fi": {"HP": 655, "PP": 120, "打撃力": 580, "射撃力": 450, "法撃力": 540, "技量": 415, "打撃防御": 580, "射撃防御": 450, "法撃防御": 450},
@@ -60,6 +59,7 @@ def custom_round_half_up(num):
     return int(num + 0.5)
 
 # --- セッションステートの初期化 ---
+# 初回デフォルト値: Gu/Lu, キャスト女, マグ射撃200
 if 'main_class_select' not in st.session_state: st.session_state['main_class_select'] = "Gu" 
 if 'sub_class_select' not in st.session_state: st.session_state['sub_class_select'] = "Lu" 
 if 'race_select' not in st.session_state: st.session_state['race_select'] = "キャスト女" 
@@ -73,7 +73,7 @@ if 'class_boost_enabled' not in st.session_state: st.session_state['class_boost_
 
 def get_calculated_stats():
     """
-    HP/PPにはユーザーロジックを適用（ただしPPはサブクラス不参照に変更）。
+    HP/PPにはユーザーロジックを適用（PPはサブクラス不参照）。
     それ以外には標準ロジックを適用します。
     """
     
@@ -84,7 +84,7 @@ def get_calculated_stats():
     race_cor = RACE_CORRECTIONS.get(race, {})
     mag_stats = st.session_state['mag_stats']
     
-    # クラスブーストボーナス
+    # クラスブーストボーナスを適用するかどうか
     CB_BONUS = CLASS_BOOST_BONUS if st.session_state['class_boost_enabled'] else {k: 0 for k in CLASS_BOOST_BONUS.keys()}
         
     calculated_stats = {}
@@ -97,8 +97,7 @@ def get_calculated_stats():
         
         if stat_name == 'HP':
             # -----------------------------------------------------
-            # HP 計算 (お客様の独自ロジックを絶対的に適用)
-            # floor((Main_Base * Race) + (Sub_Base * Race * 0.2) + CB_Bonus)
+            # HP 計算ロジック: floor((Main * Race) + (Sub * Race * 0.2) + CB)
             # -----------------------------------------------------
 
             # 1. メインクラス貢献度 (丸め処理なし)
@@ -119,8 +118,7 @@ def get_calculated_stats():
             
         elif stat_name == 'PP':
             # -----------------------------------------------------
-            # PP 計算 (お客様の指示に基づきサブクラス不参照)
-            # floor((Main_Base * Race) + CB_Bonus)
+            # PP 計算ロジック: floor((Main * Race) + CB)
             # -----------------------------------------------------
             
             # 1. メインクラス貢献度 (丸め処理なし)
@@ -135,15 +133,13 @@ def get_calculated_stats():
             
         else:
             # -----------------------------------------------------
-            # 攻撃力/防御力/技量 計算 (標準ロジックを適用)
+            # 攻撃力/防御力/技量 計算 (標準ロジック: 途中丸めあり)
             # -----------------------------------------------------
 
             # 1. メインクラスによるステータス計算 (種族補正適用 + 途中丸め)
             if stat_name in ["打撃力", "射撃力", "法撃力", "技量"]:
-                # 攻撃力/技量は切り捨て (FLOOR)
                 main_final_value = custom_floor(wiki_main_base_val * race_multiplier)
             elif stat_name in ["打撃防御", "射撃防御", "法撃防御"]:
-                # 防御力は四捨五入 (X.5で繰り上げ)
                 main_final_value = custom_round_half_up(wiki_main_base_val * race_multiplier)
                 
             total_value = float(main_final_value)
@@ -175,8 +171,8 @@ def get_calculated_stats():
 # Streamlit UI
 # =================================================================
 
-st.title("📚 1. ステータス計算機 (PPサブクラス不参照)")
-st.caption("※ **HPのみ**お客様の計算式 $\text{floor}((\text{Main } \times \text{Race}) + (\text{Sub} \times \text{Race} \times \text{0.2}) + \text{CB})$ を適用しています。")
+st.title("📚 1. ステータス計算機 (HP/PPロジック適用済み)")
+st.caption("※ **HPのみ**お客様の計算式を適用 (目標値 **917** に一致)")
 
 # =================================================================
 # 1. クラス構成 (クラス / サブクラス)
@@ -194,6 +190,7 @@ with col_main_class:
 
 with col_sub_class:
     if main_class in SUCCESSOR_MAIN_CLASSES:
+        # 後継クラスの場合、サブクラスは選択不可
         st.selectbox(
             "サブクラス",
             options=["None"],
@@ -210,110 +207,11 @@ with col_sub_class:
             options=sub_class_options_filtered,
             key="sub_class_select",
         )
+        # Hrが誤って選択された場合の処理（保険）
         if st.session_state.get('sub_class_select') == "Hr":
             st.warning("Hrはサブクラスに設定できません。Noneに戻します。")
             st.session_state['sub_class_select'] = "None"
             st.rerun()
 
-
-st.markdown("---")
-
-# =================================================================
-# 2. 種族設定
-# =================================================================
-
-st.subheader("種族設定")
-
-RACE_OPTIONS = list(RACE_CORRECTIONS.keys())
-st.selectbox(
-    "種族",
-    options=RACE_OPTIONS,
-    key="race_select",
-)
-
-st.markdown("---")
-
-# =================================================================
-# 3. マグ設定と各種ボーナス
-# =================================================================
-
-st.subheader("マグ/ボーナス設定")
-
-# --- マグの入力 ---
-st.markdown("##### マグのステータス")
-current_total_mag = sum(st.session_state['mag_stats'].values())
-MAG_MAX_TOTAL = 200
-st.markdown(f"**合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**")
-
-if current_total_mag > MAG_MAX_TOTAL:
-    st.error(f"マグの合計値が上限の {MAG_MAX_TOTAL} を超えています！")
-elif current_total_mag == MAG_MAX_TOTAL:
-    st.success("マグの合計値が上限に達しました。", icon="✅")
-
-mag_cols = st.columns(3) 
-mag_fields = [["打撃力", "射撃力", "法撃力"], ["打撃防御", "射撃防御", "法撃防御"], ["技量"]]
-
-def update_mag_stats(field):
-    st.session_state['mag_stats'][field] = st.session_state[f"mag_input_{field}"]
-
-for col_idx, fields in enumerate(mag_fields):
-    with mag_cols[col_idx]:
-        for field in fields:
-            st.number_input(
-                field,
-                min_value=0,
-                max_value=MAG_MAX_TOTAL, 
-                key=f"mag_input_{field}",
-                value=st.session_state['mag_stats'].get(field, 0),
-                step=1,
-                label_visibility="visible",
-                on_change=update_mag_stats,
-                args=(field,)
-            )
-
-# --- クラスブースト設定 ---
-st.markdown("##### 固定ボーナス")
-st.checkbox(
-    "クラスブースト（全クラスLv75達成）",
-    key="class_boost_enabled",
-    value=st.session_state['class_boost_enabled'],
-    help="HP+60, PP+10, 攻撃力+120, 技量+60, 防御力+90が加算されます。"
-)
-
-
-st.markdown("---")
-
-# =================================================================
-# 4. 合計基本ステータス表示 (計算結果表示)
-# =================================================================
-
-# 補正込みの合計値を計算
-total_stats = get_calculated_stats()
-
-st.subheader("合計基本ステータス")
-
-# HPとPPのロジック表示
-st.markdown(f"**HP ロジック:** Main $\text{+ } \text{Sub} \times \text{0.2 } \text{+ } \text{CB} \rightarrow \text{floor}$ (目標値 **917** に一致)")
-st.markdown(f"**PP ロジック:** Main $\text{+ } \text{CB} \rightarrow \text{floor}$ (サブクラス不参照)")
-
-
-# ステータス表示を整頓
-stat_pairs = [
-    ("打撃力", "打撃防御"),
-    ("射撃力", "射撃防御"),
-    ("法撃力", "法撃防御"),
-    ("技量", None),
-    ("HP", "PP")
-]
-
-for stat1_name, stat2_name in stat_pairs:
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.metric(label=f"{stat1_name} (Total)", value=f"{total_stats[stat1_name]}")
-    
-    if stat2_name:
-        with col2:
-            st.metric(label=f"{stat2_name} (Total)", value=f"{total_stats[stat2_name]}")
 
 st.markdown("---")
