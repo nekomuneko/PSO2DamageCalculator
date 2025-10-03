@@ -1,5 +1,4 @@
 import streamlit as st
-import json
 import math
 
 st.set_page_config(layout="wide")
@@ -8,9 +7,9 @@ st.set_page_config(layout="wide")
 # 1. 補正データ定義 (お客様の命令に基づきWIKI値とロジックを適用)
 # =================================================================
 
-# --- WIKIから提供されたLv100メインクラス補正済み基礎値 ---
-# 【命令厳守】GuのHP基礎値をWIKIに記載の「650」に再々復元しました。
-WIKI_MAIN_STATS = {
+# --- Lv100メインクラス補正済み基礎値 ---
+# GuのHP基礎値はWIKI値「650」に戻してあります。
+WIKI_BASE_STATS = {
     "Hu": {"HP": 764, "PP": 120, "打撃力": 580, "射撃力": 540, "法撃力": 451, "技量": 415, "打撃防御": 580, "射撃防御": 451, "法撃防御": 451},
     "Fi": {"HP": 655, "PP": 120, "打撃力": 580, "射撃力": 450, "法撃力": 540, "技量": 415, "打撃防御": 580, "射撃防御": 450, "法撃防御": 450},
     "Ra": {"HP": 645, "PP": 120, "打撃力": 540, "射撃力": 580, "法撃力": 450, "技量": 415, "打撃防御": 450, "射撃防御": 580, "法撃防御": 450},
@@ -44,10 +43,10 @@ CLASS_BOOST_BONUS = {
 }
 # -------------------------------------------------------------------
 
-# マグのステータス定義
+# 定数と初期化
 MAG_STATS_FIELDS = ["打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
 STATS_FIELDS = ["HP", "PP", "打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
-ALL_CLASSES = list(WIKI_MAIN_STATS.keys())
+ALL_CLASSES = list(WIKI_BASE_STATS.keys())
 UNAVAILABLE_SUBCLASSES = ["Hr"]
 SUCCESSOR_MAIN_CLASSES = ["Hr", "Ph", "Et", "Lu"]
 
@@ -74,7 +73,8 @@ if 'class_boost_enabled' not in st.session_state: st.session_state['class_boost_
 
 def get_calculated_stats():
     """
-    お客様の命令に従い、HP/PPにはユーザー独自ロジックを、それ以外には標準ロジックを適用します。
+    HP/PPにはユーザーロジックを適用（ただしPPはサブクラス不参照に変更）。
+    それ以外には標準ロジックを適用します。
     """
     
     race = st.session_state['race_select']
@@ -90,24 +90,24 @@ def get_calculated_stats():
     calculated_stats = {}
 
     for stat_name in STATS_FIELDS:
-        wiki_main_base_val = WIKI_MAIN_STATS.get(main_class, {}).get(stat_name, 0)
+        wiki_main_base_val = WIKI_BASE_STATS.get(main_class, {}).get(stat_name, 0)
         race_multiplier = race_cor.get(stat_name, 1.0)
         total_value = 0.0 # 浮動小数点計算用に初期化
 
         
-        if stat_name in ['HP', 'PP']:
+        if stat_name == 'HP':
             # -----------------------------------------------------
-            # HP/PP 計算 (お客様の独自ロジックを絶対的に適用)
-            # (クラス基礎ボーナスx種族ボーナス)＋(クラス基礎ボーナスx種族ボーナスx0.2)＋クラスブースト
+            # HP 計算 (お客様の独自ロジックを絶対的に適用)
+            # floor((Main_Base * Race) + (Sub_Base * Race * 0.2) + CB_Bonus)
             # -----------------------------------------------------
 
             # 1. メインクラス貢献度 (丸め処理なし)
             main_contribution = wiki_main_base_val * race_multiplier
             total_value += main_contribution
             
-            # 2. サブクラス貢献度 (サブクラスもHP/PPに貢献すると仮定し、0.2倍)
+            # 2. サブクラス貢献度 (HPのみサブクラスもHPに貢献すると仮定し、0.2倍)
             if sub_class_select != 'None':
-                wiki_sub_base_val = WIKI_MAIN_STATS.get(sub_class_select, {}).get(stat_name, 0)
+                wiki_sub_base_val = WIKI_BASE_STATS.get(sub_class_select, {}).get(stat_name, 0)
                 sub_contribution = (wiki_sub_base_val * race_multiplier) * 0.2
                 total_value += sub_contribution
             
@@ -115,6 +115,22 @@ def get_calculated_stats():
             total_value += CB_BONUS.get(stat_name, 0)
             
             # 4. 最終結果を切り捨て (floor)
+            calculated_stats[stat_name] = custom_floor(total_value)
+            
+        elif stat_name == 'PP':
+            # -----------------------------------------------------
+            # PP 計算 (お客様の指示に基づきサブクラス不参照)
+            # floor((Main_Base * Race) + CB_Bonus)
+            # -----------------------------------------------------
+            
+            # 1. メインクラス貢献度 (丸め処理なし)
+            main_contribution = wiki_main_base_val * race_multiplier
+            total_value += main_contribution
+            
+            # 2. クラスブースト固定値
+            total_value += CB_BONUS.get(stat_name, 0)
+            
+            # 3. 最終結果を切り捨て (floor)
             calculated_stats[stat_name] = custom_floor(total_value)
             
         else:
@@ -133,11 +149,12 @@ def get_calculated_stats():
             total_value = float(main_final_value)
 
             # 2. マグボーナス加算
-            total_value += mag_stats.get(stat_name, 0)
+            if stat_name in MAG_STATS_FIELDS:
+                total_value += mag_stats.get(stat_name, 0)
             
-            # 3. サブクラス貢献度計算
+            # 3. サブクラス貢献度計算 (攻撃力/防御力/技量はサブ貢献 20% + 途中丸め)
             if sub_class_select != 'None' and main_class not in SUCCESSOR_MAIN_CLASSES:
-                wiki_sub_base_val = WIKI_MAIN_STATS.get(sub_class_select, {}).get(stat_name, 0)
+                wiki_sub_base_val = WIKI_BASE_STATS.get(sub_class_select, {}).get(stat_name, 0)
 
                 # 3-1. サブクラスの種族補正適用 (切り捨て)
                 sub_after_race = custom_floor(wiki_sub_base_val * race_multiplier)
@@ -158,8 +175,8 @@ def get_calculated_stats():
 # Streamlit UI
 # =================================================================
 
-st.title("📚 1. ステータス計算機 (お客様のHP/PP計算ロジック適用)")
-st.caption("※ **お客様の $\text{HP}/\text{PP}$ 計算式** $\text{(Main } \text{+ } \text{Sub} \times \text{0.2)}$ を絶対的に採用し、計算結果 $\mathbf{917}$ に一致させています。")
+st.title("📚 1. ステータス計算機 (PPサブクラス不参照)")
+st.caption("※ **HPのみ**お客様の計算式 $\text{floor}((\text{Main } \times \text{Race}) + (\text{Sub} \times \text{Race} \times \text{0.2}) + \text{CB})$ を適用しています。")
 
 # =================================================================
 # 1. クラス構成 (クラス / サブクラス)
@@ -273,9 +290,12 @@ st.markdown("---")
 # 補正込みの合計値を計算
 total_stats = get_calculated_stats()
 
-st.subheader("合計基本ステータス (実測値917に一致)")
+st.subheader("合計基本ステータス")
 
-st.markdown(f"##### (HP/PPロジック: Main $\text{+ } \text{Sub} \times \text{0.2 } \text{+ } \text{CB} \rightarrow \text{floor}$)")
+# HPとPPのロジック表示
+st.markdown(f"**HP ロジック:** Main $\text{+ } \text{Sub} \times \text{0.2 } \text{+ } \text{CB} \rightarrow \text{floor}$ (目標値 **917** に一致)")
+st.markdown(f"**PP ロジック:** Main $\text{+ } \text{CB} \rightarrow \text{floor}$ (サブクラス不参照)")
+
 
 # ステータス表示を整頓
 stat_pairs = [
