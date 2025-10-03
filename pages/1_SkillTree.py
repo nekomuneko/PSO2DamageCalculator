@@ -10,16 +10,19 @@ st.set_page_config(layout="wide")
 # 1. 補正データ定義 (拡張性のため、ここに静的データを集約)
 # =================================================================
 
-# --- プレイヤー基礎ステータス (固定値) ---
-# 基礎ステータス入力UIを削除したため、これらの値を定数として使用します。
-BASE_HP_CONST = 650
-BASE_PP_CONST = 120
-BASE_ATK_CONST = 540       # 打撃力、射撃力、法撃力の基礎値
-BASE_DEF_CONST = 450       # 打撃防御、射撃防御、法撃防御の基礎値
-BASE_ACCURACY_CONST = 415  # 技量の基礎値
+# --- プレイヤー基礎ステータス (Lv100固定値として設定) ---
+# お客様の入力値(1072)に合わせて攻撃力を設定します。
+# これが種族・クラス補正の乗算対象となる「素のLv100ステータス」となります。
+BASE_HP_CONST = 900          # (Lv1:650 + LvUp:250)
+BASE_PP_CONST = 145          # (Lv1:120 + LvUp:25)
+BASE_ATK_CONST = 1072        # 打撃力、射撃力、法撃力の基礎値 (お客様の1072を反映)
+BASE_DEF_CONST = 770         # 打撃防御、射撃防御、法撃防御の基礎値 (Lv1:450 + LvUp:320)
+BASE_ACCURACY_CONST = 595    # 技量の基礎値 (Lv1:415 + LvUp:180)
+
+# Lv固定ボーナスの定義は不要になりました
+# LV95_FIXED_BONUS_DEFAULTS = {...}
 
 # --- 種族補正データ (乗算補正: 1.05 = +5%, 0.95 = -5%) ---
-# 最終的な計算は小数点以下を四捨五入(round)または切り捨て(int/floor)
 RACE_CORRECTIONS = {
     "ヒューマン男": {"HP": 1.05, "PP": 1.00, "打撃力": 1.04, "射撃力": 1.03, "法撃力": 1.00, "技量": 1.05, "打撃防御": 1.05, "射撃防御": 1.00, "法撃防御": 1.00},
     "ヒューマン女": {"HP": 1.04, "PP": 1.00, "打撃力": 1.00, "射撃力": 1.03, "法撃力": 1.04, "技量": 1.06, "打撃防御": 1.00, "射撃防御": 1.00, "法撃防御": 1.05},
@@ -31,7 +34,7 @@ RACE_CORRECTIONS = {
     "デューマン女": {"HP": 0.95, "PP": 1.00, "打撃力": 1.06, "射撃力": 1.05, "法撃力": 1.05, "技量": 1.06, "打撃防御": 1.00, "射撃防御": 1.00, "法撃防御": 1.00},
 }
 
-# --- クラス補正データ (乗算補正: ユーザー提供データに基づき更新) ---
+# --- クラス補正データ (乗算補正) ---
 CLASS_CORRECTIONS = {
     "Hu": {"HP": 1.18, "PP": 1.00, "打撃力": 1.07, "射撃力": 1.00, "法撃力": 0.83, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, # ハンター
     "Fi": {"HP": 1.01, "PP": 1.00, "打撃力": 1.07, "射撃力": 0.83, "法撃力": 1.00, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, # ファイター
@@ -78,17 +81,6 @@ if 'race_select' not in st.session_state:
 if 'mag_stats' not in st.session_state:
     st.session_state['mag_stats'] = {field: 0 for field in MAG_STATS_FIELDS}
 
-# --- スキルツリー固定値ボーナス ---
-# ※ 計算には反映しないが、入力UIには表示できるように維持
-if 'st_fixed_bonus' not in st.session_state:
-    st.session_state['st_fixed_bonus'] = {
-        "HP": 50, 
-        "PP": 10, 
-        "打撃力": 50, "射撃力": 160, "法撃力": 50, 
-        "技量": 50,
-        "打撃防御": 50, "射撃防御": 50, "法撃防御": 50, 
-    }
-
 # --- クラスブーストON/OFF ---
 if 'class_boost_enabled' not in st.session_state:
     st.session_state['class_boost_enabled'] = True 
@@ -107,12 +99,12 @@ SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
 
 def get_calculated_stats():
     """
-    ユーザー入力、種族補正、クラス補正、マグ補正、クラスブーストを合算した基本ステータスを計算します。
-    【重要】お客様情報に基づき、ATK/DEF/ACC/技量の乗算補正には四捨五入（round）を適用します。
+    Lv100基礎ステータスを起点に、種族補正、クラス補正、マグ補正、クラスブーストを合算した基本ステータスを計算します。
+    【重要】ATK/DEF/ACC/技量の乗算補正には四捨五入（round）を適用します。
     
     計算式: 
-    [ATK/DEF/ACC/技量]: ROUND(ROUND(基礎値 * 種族補正) * メイン補正) + INT(サブクラス値 * 0.2) + マグ + クラスブースト
-    [HP/PP]: INT(INT(基礎値 * 種族補正) * メイン補正) + クラスブースト (HP/PPは切り捨てを維持)
+    [ATK/DEF/ACC/技量]: ROUND(ROUND(Lv100基礎値 * 種族補正) * メイン補正) + INT(サブクラス値 * 0.2) + マグ + クラスブースト
+    [HP/PP]: INT(INT(Lv100基礎値 * 種族補正) * メイン補正) + クラスブースト (HP/PPは切り捨てを維持)
     """
     
     # 選択されている設定の取得
@@ -125,7 +117,7 @@ def get_calculated_stats():
     mag_stats = st.session_state['mag_stats']
     sub_class_select = st.session_state['sub_class_select']
 
-    # 計算に使う固定基礎値の定義
+    # 計算に使う固定基礎値の定義 (Lv100ベース)
     BASE_ATK_VAL = BASE_ATK_CONST
     BASE_DEF_VAL = BASE_DEF_CONST
     BASE_ACCURACY_VAL = BASE_ACCURACY_CONST
@@ -143,7 +135,7 @@ def get_calculated_stats():
         base_stat_type: 'atk', 'def', 'acc', 'hp', 'pp'
         """
         
-        # 基礎値の取得
+        # 基礎値の取得 (Lv100)
         if base_stat_type == 'atk': base_val = BASE_ATK_VAL
         elif base_stat_type == 'def': base_val = BASE_DEF_VAL
         elif base_stat_type == 'acc': base_val = BASE_ACCURACY_VAL
@@ -157,31 +149,28 @@ def get_calculated_stats():
         
         # HP/PPの計算: 切り捨て(INT)を維持
         if base_stat_type in ['hp', 'pp']:
-            # 1. 種族補正適用 (INT(基礎値 * 種族補正))
+            # 1. 種族補正適用 (INT(Lv100基礎値 * 種族補正))
             base_after_race = int(base_val * race_multiplier)
             # 2. メインクラス貢献分: INT(↑ * メインクラス補正)
-            main_contribution = int(base_after_race * main_class_multiplier)
-            total_value = main_contribution
+            total_value = int(base_after_race * main_class_multiplier)
             
             # HP/PPにはサブクラス・マグボーナス無し
             
         else:
-            # ATK/DEF/ACC/技量の計算: お客様情報に基づき、乗算補正には四捨五入(ROUND)を適用
+            # ATK/DEF/ACC/技量の計算: 乗算補正には四捨五入(ROUND)を適用
             
-            # 1. 種族補正適用 (ROUND(基礎値 * 種族補正))
+            # 1. 種族補正適用 (ROUND(Lv100基礎値 * 種族補正))
             base_after_race = round(base_val * race_multiplier)
 
             # 2. メインクラス貢献分: ROUND(↑ * メインクラス補正)
-            main_contribution = round(base_after_race * main_class_multiplier)
-            total_value = main_contribution
-
+            total_value = round(base_after_race * main_class_multiplier)
+            
             # 3. サブクラス貢献分 (Hr/Ph/Et/Luはサブクラス設定不可)
             if sub_class_select != 'None':
                 sub_cor = CLASS_CORRECTIONS.get(sub_class_select, {})
                 sub_class_multiplier = sub_cor.get(stat_name, 1.0)
 
-                # サブクラス値: ROUND(ROUND(基礎値 * 種族補正) * サブクラス補正)
-                # サブクラス値の計算にも四捨五入を適用
+                # サブクラス値: ROUND(ROUND(Lv100基礎値 * 種族補正) * サブクラス補正)
                 sub_class_stat_value_before_mult = round(base_after_race * sub_class_multiplier)
                 
                 # サブクラス貢献分: INT(サブクラス値 * 0.2) (0.2倍のボーナスは切り捨ての可能性が高いためINTを維持)
@@ -196,12 +185,9 @@ def get_calculated_stats():
         # 5. クラスブースト増加分 (全ステータス共通)
         total_value += CB_BONUS.get(stat_name, 0)
         
-        # 6. スキルツリー固定値ボーナス増加分 (計算には含めない)
-        
         return total_value
 
     # --- 計算実行 ---
-    # ステータス名と対応する基礎値タイプをマッピング
     stat_mapping = {
         "打撃力": 'atk', "射撃力": 'atk', "法撃力": 'atk',
         "打撃防御": 'def', "射撃防御": 'def', "法撃防御": 'def',
@@ -246,7 +232,7 @@ with col_sub_class:
         st.session_state['sub_class_select'] = "None" 
         st.info(f"{main_class}は後継クラスのため、サブクラスはNone固定です。", icon="ℹ️")
     else:
-        sub_class_options_filtered = ["None"] + [c for c in SUB_CLASSES_CANDIDATES if c != main_class]
+        sub_class_options_filtered = ["None"] + [c for c in ALL_CLASSES if c != "Hr" and c != main_class]
 
         st.selectbox(
             "サブクラス",
@@ -257,7 +243,7 @@ with col_sub_class:
 st.markdown("---")
 
 # =================================================================
-# 2. 種族 / マグ設定
+# 2. 種族設定
 # =================================================================
 
 # --- 種族セクション ---
@@ -277,7 +263,12 @@ st.selectbox(
 
 st.markdown("---")
 
-# --- マグセクション ---
+# Lv固定ボーナス設定セクションは削除されました
+
+# =================================================================
+# 3. マグ設定
+# =================================================================
+
 st.subheader("マグ設定")
 
 # 合計値の計算とチェック
@@ -354,7 +345,7 @@ st.checkbox(
 st.markdown("---")
 
 # =================================================================
-# 3. 合計基本ステータス表示 (計算結果表示)
+# 4. 合計基本ステータス表示 (計算結果表示)
 # =================================================================
 
 # 補正込みの合計値を計算
@@ -362,8 +353,8 @@ total_stats = get_calculated_stats()
 
 st.subheader("合計基本ステータス (計算式適用後)")
 
-st.markdown("##### (基礎値 + 種族補正 + クラス補正 + クラスブースト + マグ)")
-st.caption(f"※ 基礎値: HP:{BASE_HP_CONST}, PP:{BASE_PP_CONST}, 攻撃力:{BASE_ATK_CONST}, 防御力:{BASE_DEF_CONST}, 技量:{BASE_ACCURACY_CONST}")
+st.markdown(f"##### (Lv100基礎値 + 種族補正 + クラス補正 + クラスブースト + マグ)")
+st.caption(f"※ Lv100基礎値: HP:{BASE_HP_CONST}, PP:{BASE_PP_CONST}, 攻撃力:{BASE_ATK_CONST}, 防御力:{BASE_DEF_CONST}, 技量:{BASE_ACCURACY_CONST}")
 
 col_atk, col_def = st.columns(2)
 
@@ -401,77 +392,6 @@ with col_pp:
 st.markdown("---")
 
 # =================================================================
-# 4. スキルツリー固定値ボーナス設定 (計算には未反映)
-# =================================================================
-st.subheader("スキルツリー固定値ボーナス (調整用)")
-st.caption("※ **現在、このセクションで入力された数値は、合計基本ステータスには加算されていません。** ズレを確認するための一時的な入力欄です。")
-
-st_bonus_cols = st.columns(4)
-
-# 入力値の更新関数
-def update_st_bonus(field):
-    """スキルツリーボーナスの値をセッションステートに保存するコールバック"""
-    st.session_state['st_fixed_bonus'][field] = st.session_state[f'st_bonus_input_{field}']
-
-# HP / PP
-with st_bonus_cols[0]:
-    # HP
-    st.number_input(
-        "HP (STボーナス)",
-        min_value=0,
-        key='st_bonus_input_HP',
-        value=st.session_state['st_fixed_bonus']['HP'],
-        step=1,
-        on_change=lambda f='HP': update_st_bonus(f)
-    )
-    # PP
-    st.number_input(
-        "PP (STボーナス)",
-        min_value=0,
-        key='st_bonus_input_PP',
-        value=st.session_state['st_fixed_bonus']['PP'],
-        step=1,
-        on_change=lambda f='PP': update_st_bonus(f)
-    )
-
-# 攻撃力
-for i, field in enumerate(["打撃力", "射撃力", "法撃力"]):
-    with st_bonus_cols[1 + (i // 3)]: # 1列目 (攻撃力)
-        st.number_input(
-            f"{field} (STボーナス)",
-            min_value=0,
-            key=f'st_bonus_input_{field}',
-            value=st.session_state['st_fixed_bonus'][field],
-            step=1,
-            on_change=lambda f=field: update_st_bonus(f)
-        )
-# 技量
-with st_bonus_cols[2]:
-    field = "技量"
-    st.number_input(
-        f"{field} (STボーナス)",
-        min_value=0,
-        key=f'st_bonus_input_{field}',
-        value=st.session_state['st_fixed_bonus'][field],
-        step=1,
-        on_change=lambda f=field: update_st_bonus(f)
-    )
-
-# 防御力
-for i, field in enumerate(["打撃防御", "射撃防御", "法撃防御"]):
-    with st_bonus_cols[3]: # 4列目 (防御力)
-        st.number_input(
-            f"{field} (STボーナス)",
-            min_value=0,
-            key=f'st_bonus_input_{field}',
-            value=st.session_state['st_fixed_bonus'][field],
-            step=1,
-            on_change=lambda f=field: update_st_bonus(f)
-        )
-
-st.markdown("---")
-
-# =================================================================
 # 5. エクスポート/インポート機能 (in / out)
 # =================================================================
 
@@ -489,10 +409,10 @@ export_data = {
     # クラスブースト設定値
     "class_boost_enabled": st.session_state['class_boost_enabled'],
     
-    # スキルツリー固定値（入力値）をエクスポート
-    "st_fixed_bonus": st.session_state['st_fixed_bonus'], 
+    # Lv100ベースに統一したため、Lv固定ボーナスはエクスポート不要になりました。
+    # "level_fixed_bonus": st.session_state['level_fixed_bonus'], 
 
-    "version": "pso2_dmg_calc_v7_round_correction"
+    "version": "pso2_dmg_calc_v9_lvl100_base"
 }
 
 export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
@@ -532,13 +452,9 @@ if uploaded_file is not None:
             if "class_boost_enabled" in data:
                 st.session_state['class_boost_enabled'] = data["class_boost_enabled"]
 
-            # スキルツリー固定値のインポート (新しい項目)
-            if "st_fixed_bonus" in data:
-                 st.session_state['st_fixed_bonus'] = data["st_fixed_bonus"]
-                 # UIの更新
-                 for field, value in data["st_fixed_bonus"].items():
-                    if f"st_bonus_input_{field}" in st.session_state:
-                        st.session_state[f"st_bonus_input_{field}"] = value
+            # 以前のLv固定ボーナスデータは無視します
+            # if "level_fixed_bonus" in data:
+            #     st.session_state['level_fixed_bonus'] = data["level_fixed_bonus"]
                          
 
             st.success(f"設定をインポートしました。")
