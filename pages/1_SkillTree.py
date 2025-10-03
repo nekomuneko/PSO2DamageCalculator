@@ -2,7 +2,7 @@
 
 import streamlit as st
 import json
-import math # math.floorやint()で小数点以下を切り捨てる
+import math 
 
 st.set_page_config(layout="wide")
 
@@ -19,7 +19,7 @@ BASE_DEF_CONST = 450       # 打撃防御、射撃防御、法撃防御の基礎
 BASE_ACCURACY_CONST = 415  # 技量の基礎値
 
 # --- 種族補正データ (乗算補正: 1.05 = +5%, 0.95 = -5%) ---
-# 最終的な計算は小数点以下を切り捨て。
+# 最終的な計算は小数点以下を四捨五入(round)または切り捨て(int/floor)
 RACE_CORRECTIONS = {
     "ヒューマン男": {"HP": 1.05, "PP": 1.00, "打撃力": 1.04, "射撃力": 1.03, "法撃力": 1.00, "技量": 1.05, "打撃防御": 1.05, "射撃防御": 1.00, "法撃防御": 1.00},
     "ヒューマン女": {"HP": 1.04, "PP": 1.00, "打撃力": 1.00, "射撃力": 1.03, "法撃力": 1.04, "技量": 1.06, "打撃防御": 1.00, "射撃防御": 1.00, "法撃防御": 1.05},
@@ -64,7 +64,7 @@ MAG_STATS_FIELDS = ["打撃力", "射撃力", "法撃力", "技量", "打撃防�
 
 # --- セッションステートの初期化 ---
 if 'main_class_select' not in st.session_state:
-    st.session_state['main_class_select'] = "Br" # ユーザーの設定に合わせてデフォルトを変更
+    st.session_state['main_class_select'] = "Br" 
 if 'sub_class_select' not in st.session_state:
     st.session_state['sub_class_select'] = "None"
 if 'skills_data' not in st.session_state:
@@ -108,11 +108,11 @@ SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
 def get_calculated_stats():
     """
     ユーザー入力、種族補正、クラス補正、マグ補正、クラスブーストを合算した基本ステータスを計算します。
-    【重要】乗算補正の適用ごとに小数点以下を切り捨てることで、ズレを修正します。
+    【重要】お客様情報に基づき、ATK/DEF/ACC/技量の乗算補正には四捨五入（round）を適用します。
     
     計算式: 
-    [ATK/DEF/ACC]: INT(INT(基礎値 * 種族補正) * メイン補正) + INT(サブクラス値 * 0.2) + マグ + クラスブースト
-    [HP/PP]: INT(INT(基礎値 * 種族補正) * メイン補正) + クラスブースト (HP/PPにはサブクラス・マグボーナス無し)
+    [ATK/DEF/ACC/技量]: ROUND(ROUND(基礎値 * 種族補正) * メイン補正) + INT(サブクラス値 * 0.2) + マグ + クラスブースト
+    [HP/PP]: INT(INT(基礎値 * 種族補正) * メイン補正) + クラスブースト (HP/PPは切り捨てを維持)
     """
     
     # 選択されている設定の取得
@@ -125,7 +125,7 @@ def get_calculated_stats():
     mag_stats = st.session_state['mag_stats']
     sub_class_select = st.session_state['sub_class_select']
 
-    # 計算に使う固定基礎値の定義 (UI削除に伴い定数を使用)
+    # 計算に使う固定基礎値の定義
     BASE_ATK_VAL = BASE_ATK_CONST
     BASE_DEF_VAL = BASE_DEF_CONST
     BASE_ACCURACY_VAL = BASE_ACCURACY_CONST
@@ -155,37 +155,48 @@ def get_calculated_stats():
         race_multiplier = race_cor.get(stat_name, 1.0)
         main_class_multiplier = class_cor.get(stat_name, 1.0)
         
-        # 1. 種族補正適用 (INT(基礎値 * 種族補正))
-        # ここでまず切り捨てを適用
-        base_after_race = int(base_val * race_multiplier)
-
-        # 2. メインクラス貢献分: INT(↑ * メインクラス補正)
-        main_contribution = int(base_after_race * main_class_multiplier)
-        total_value = main_contribution
-
-        # 3. サブクラス貢献分 (ATK/DEF/ACC/技量のみ、Hr/Ph/Et/Luはサブクラス設定不可)
-        if base_stat_type in ['atk', 'def', 'acc'] and sub_class_select != 'None':
-            sub_cor = CLASS_CORRECTIONS.get(sub_class_select, {})
-            sub_class_multiplier = sub_cor.get(stat_name, 1.0)
-
-            # サブクラス値: INT(INT(基礎値 * 種族補正) * サブクラス補正)
-            # ここでも種族補正適用後に切り捨てた値を使用
-            sub_class_stat_value_before_mult = int(base_after_race * sub_class_multiplier)
+        # HP/PPの計算: 切り捨て(INT)を維持
+        if base_stat_type in ['hp', 'pp']:
+            # 1. 種族補正適用 (INT(基礎値 * 種族補正))
+            base_after_race = int(base_val * race_multiplier)
+            # 2. メインクラス貢献分: INT(↑ * メインクラス補正)
+            main_contribution = int(base_after_race * main_class_multiplier)
+            total_value = main_contribution
             
-            # サブクラス貢献分: INT(サブクラス値 * 0.2)
-            sub_contribution = int(sub_class_stat_value_before_mult * 0.2)
-            total_value += sub_contribution
+            # HP/PPにはサブクラス・マグボーナス無し
             
-        # 4. マグ増加分 (ATK/DEF/ACC/技量のみ)
-        if stat_name in mag_stats: 
-            mag_bonus = mag_stats.get(stat_name, 0)
-            total_value += mag_bonus
+        else:
+            # ATK/DEF/ACC/技量の計算: お客様情報に基づき、乗算補正には四捨五入(ROUND)を適用
+            
+            # 1. 種族補正適用 (ROUND(基礎値 * 種族補正))
+            base_after_race = round(base_val * race_multiplier)
 
-        # 5. クラスブースト増加分 (全ステータス)
+            # 2. メインクラス貢献分: ROUND(↑ * メインクラス補正)
+            main_contribution = round(base_after_race * main_class_multiplier)
+            total_value = main_contribution
+
+            # 3. サブクラス貢献分 (Hr/Ph/Et/Luはサブクラス設定不可)
+            if sub_class_select != 'None':
+                sub_cor = CLASS_CORRECTIONS.get(sub_class_select, {})
+                sub_class_multiplier = sub_cor.get(stat_name, 1.0)
+
+                # サブクラス値: ROUND(ROUND(基礎値 * 種族補正) * サブクラス補正)
+                # サブクラス値の計算にも四捨五入を適用
+                sub_class_stat_value_before_mult = round(base_after_race * sub_class_multiplier)
+                
+                # サブクラス貢献分: INT(サブクラス値 * 0.2) (0.2倍のボーナスは切り捨ての可能性が高いためINTを維持)
+                sub_contribution = int(sub_class_stat_value_before_mult * 0.2)
+                total_value += sub_contribution
+            
+            # 4. マグ増加分
+            if stat_name in mag_stats: 
+                mag_bonus = mag_stats.get(stat_name, 0)
+                total_value += mag_bonus
+
+        # 5. クラスブースト増加分 (全ステータス共通)
         total_value += CB_BONUS.get(stat_name, 0)
         
-        # 6. スキルツリー固定値ボーナス増加分 (計算には含めないよう、この行は削除/コメントアウト)
-        # total_value += st_fixed_bonus.get(stat_name, 0) 
+        # 6. スキルツリー固定値ボーナス増加分 (計算には含めない)
         
         return total_value
 
@@ -481,7 +492,7 @@ export_data = {
     # スキルツリー固定値（入力値）をエクスポート
     "st_fixed_bonus": st.session_state['st_fixed_bonus'], 
 
-    "version": "pso2_dmg_calc_v6_strict_floor"
+    "version": "pso2_dmg_calc_v7_round_correction"
 }
 
 export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
