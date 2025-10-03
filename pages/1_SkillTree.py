@@ -4,7 +4,7 @@ import math
 st.set_page_config(layout="wide")
 
 # =================================================================
-# 1. 補正データ定義
+# 1. 補正データ定義 (変更なし)
 # =================================================================
 
 # --- Lv100メインクラス補正済み基礎値 ---
@@ -67,7 +67,7 @@ if 'mag_stats' not in st.session_state:
 if 'class_boost_enabled' not in st.session_state: st.session_state['class_boost_enabled'] = True 
 
 # =================================================================
-# 2. 計算関数
+# 2. 計算関数 (変更なし)
 # =================================================================
 
 def get_calculated_stats():
@@ -178,15 +178,17 @@ st.markdown("---")
 # 1. クラス構成 (クラス / サブクラス)
 # =================================================================
 
-st.subheader("クラス構成")
+# ヘッダーをサブヘッダーからMarkdownのh3にすることでコンパクト化
+st.markdown("### クラス構成")
 col_main_class, col_sub_class = st.columns(2)
 
 with col_main_class:
-    main_class = st.selectbox(
+    st.selectbox(
         "メインクラス",
         options=ALL_CLASSES,
         key="main_class_select",
     )
+    main_class = st.session_state['main_class_select']
 
 with col_sub_class:
     if main_class in SUCCESSOR_MAIN_CLASSES:
@@ -220,7 +222,7 @@ st.markdown("---")
 # 2. 種族設定
 # =================================================================
 
-st.subheader("種族設定")
+st.markdown("### 種族設定")
 
 RACE_OPTIONS = list(RACE_CORRECTIONS.keys())
 st.selectbox(
@@ -235,13 +237,13 @@ st.markdown("---")
 # 3. マグ設定と各種ボーナス
 # =================================================================
 
-st.subheader("マグ/ボーナス設定")
+st.markdown("### マグ/ボーナス設定")
 
 # --- マグの入力 ---
-st.markdown("##### マグのステータス")
+st.markdown("##### マグのステータス (合計 **200** まで)")
 current_total_mag = sum(st.session_state['mag_stats'].values())
 MAG_MAX_TOTAL = 200
-st.markdown(f"**合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**")
+st.caption(f"**合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**") # captionで文字を小さく
 
 if current_total_mag > MAG_MAX_TOTAL:
     st.error(f"マグの合計値が上限の {MAG_MAX_TOTAL} を超えています！")
@@ -250,14 +252,16 @@ elif current_total_mag == MAG_MAX_TOTAL:
 
 # 3列に分けたマグ入力フィールド
 mag_cols = st.columns(3) 
-mag_fields = [["打撃力", "射撃力", "法撃力"], ["打撃防御", "射撃防御", "法撃防御"], ["技量"]]
+mag_fields_groups = [["打撃力", "射撃力", "法撃力"], ["打撃防御", "射撃防御", "法撃防御"], ["技量"]]
 
 def update_mag_stats(field):
     st.session_state['mag_stats'][field] = st.session_state[f"mag_input_{field}"]
 
-for col_idx, fields in enumerate(mag_fields):
+for col_idx, fields in enumerate(mag_fields_groups):
     with mag_cols[col_idx]:
         for field in fields:
+            # 入力フィールドのラベルを非表示にして縦幅を削減
+            st.markdown(f"**{field}**", help=f"{field}のマグレベル")
             st.number_input(
                 field,
                 min_value=0,
@@ -265,7 +269,7 @@ for col_idx, fields in enumerate(mag_fields):
                 key=f"mag_input_{field}",
                 value=st.session_state['mag_stats'].get(field, 0),
                 step=1,
-                label_visibility="visible",
+                label_visibility="collapsed", # ラベルを非表示
                 on_change=update_mag_stats,
                 args=(field,)
             )
@@ -289,31 +293,33 @@ st.markdown("---")
 # 補正込みの合計値を計算
 total_stats = get_calculated_stats()
 
-st.subheader("合計基本ステータス")
+st.markdown("### 合計基本ステータス")
 
-# Raw String Literal (r"...") を使用してNameErrorを解消
-st.markdown("##### 適用されている基本ステータス計算ロジック")
+# 計算ロジックのタイトルをさらに小さく (h5からh6へ)
+st.markdown("###### 適用されている基本ステータス計算ロジック")
 st.markdown(r"**HP:** $\text{floor}((\text{メイン基礎値} \times \text{種族補正}) + (\text{サブ基礎値} \times \text{種族補正} \times \text{0.2}) + \text{クラスブースト})$")
 st.markdown(r"**PP:** $\text{floor}((\text{メイン基礎値} \times \text{種族補正}) + \text{クラスブースト})$ **(サブクラス不参照)**")
 
 
-# ステータス表示を整頓
+# ステータス表示を整頓 (HP/PPを最上位に配置、ラベルを短縮)
 stat_pairs = [
+    ("HP", "PP"),         
     ("打撃力", "打撃防御"),
     ("射撃力", "射撃防御"),
     ("法撃力", "法撃防御"),
-    ("技量", None),
-    ("HP", "PP")
+    ("技量", None)
 ]
 
 for stat1_name, stat2_name in stat_pairs:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.metric(label=f"{stat1_name} (Total)", value=f"{total_stats[stat1_name]}")
+        # ラベルを短縮
+        st.metric(label=f"**{stat1_name}**", value=f"{total_stats[stat1_name]}")
     
     if stat2_name:
         with col2:
-            st.metric(label=f"{stat2_name} (Total)", value=f"{total_stats[stat2_name]}")
+            # ラベルを短縮
+            st.metric(label=f"**{stat2_name}**", value=f"{total_stats[stat2_name]}")
 
 st.markdown("---")
