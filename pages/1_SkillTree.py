@@ -361,7 +361,8 @@ if uploaded_file is not None:
         
         if "main_class" in data and "sub_class" in data and "skills" in data:
             st.session_state['main_class_select'] = data["main_class"]
-            st.session_state['sub_class_select"] = data["sub_class"]
+            # 🚨 修正箇所: ここで引用符を修正しました ('] -> ')
+            st.session_state['sub_class_select'] = data["sub_class"]
             st.session_state['skills_data'] = data["skills"]
             
             if "race" in data:
