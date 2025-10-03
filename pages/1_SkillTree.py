@@ -2,9 +2,11 @@
 
 import streamlit as st
 import json
-# from pathlib import Path  # 現在使用されていないため削除
 
 st.set_page_config(layout="wide")
+
+# --- マグのステータス定義 ---
+MAG_STATS_FIELDS = ["打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
 
 # --- セッションステートの初期化 ---
 if 'main_class_select' not in st.session_state:
@@ -17,21 +19,91 @@ if 'gear_weapon_atk' not in st.session_state:
     st.session_state['gear_weapon_atk'] = 2000
 if 'enemy_def' not in st.session_state:
     st.session_state['enemy_def'] = 1000
+    
+# 新規追加: 種族 (Race)
+if 'race_select' not in st.session_state:
+    st.session_state['race_select'] = "ヒューマン男"
+
+# 新規追加: マグ (Mag Stats)
+if 'mag_stats' not in st.session_state:
+    st.session_state['mag_stats'] = {field: 0 for field in MAG_STATS_FIELDS}
 # --------------------------------------------------
 
 # -------------------------------------------------------------------
-# クラス定義 (ご要望の並び順: Hu, FI, Ra, Gu, Fo, Te, Br, Bo, Su, Hr, Ph, Et, Lu)
+# クラス定義 (Hu, FI, Ra, Gu, Fo, Te, Br, Bo, Su, Hr, Ph, Et, Lu)
 # -------------------------------------------------------------------
 ALL_CLASSES = ["Hu", "Fi", "Ra", "Gu", "Fo", "Te", "Br", "Bo", "Su", "Hr", "Ph", "Et", "Lu"]
-SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"] # サブクラス候補はHrを除く
+SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
 # -------------------------------------------------------------------
 
 st.title("📚 1. Skill Tree 設定")
 
-# --- 1. クラス選択エリア ---
+# =================================================================
+# 1. 種族・マグ設定エリア
+# =================================================================
+
+st.markdown("---")
+st.subheader("基本ステータス設定")
+
+col_race, col_mag_title = st.columns([1, 2])
+
+with col_race:
+    # --- 種族選択 ---
+    RACE_OPTIONS = [
+        "ヒューマン男", "ヒューマン女",
+        "ニューマン男", "ニューマン女",
+        "キャスト男", "キャスト女",
+        "デューマン男", "デューマン女"
+    ]
+    st.selectbox(
+        "種族",
+        options=RACE_OPTIONS,
+        key="race_select",
+    )
+
+with col_mag_title:
+    # マグ入力は右側のスペース全体を使用
+    st.markdown("##### マグステータス (合計 200 まで)")
+
+# --- マグの数値入力 (3列で配置) ---
+# 合計値の計算とチェックを容易にするため、入力はセッションステートに直接反映させる
+mag_cols = st.columns(3)
+current_total_mag = sum(st.session_state['mag_stats'].values())
+MAG_MAX_TOTAL = 200
+
+# 入力欄の生成
+for i, field in enumerate(MAG_STATS_FIELDS):
+    col = mag_cols[i % 3]
+    with col:
+        # 入力値は0から200に制限
+        st.number_input(
+            field,
+            min_value=0,
+            max_value=MAG_MAX_TOTAL, 
+            key=f"mag_input_{field}",
+            value=st.session_state['mag_stats'].get(field, 0),
+            step=1,
+            label_visibility="visible",
+            # コールバック: 値が変更されたらセッションステートを更新し、合計をチェック
+            on_change=lambda f=field: st.session_state['mag_stats'].__setitem__(f, st.session_state[f"mag_input_{f}"])
+        )
+
+# 合計値の表示とチェック
+st.markdown(f"**現在のマグ合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**")
+
+if current_total_mag > MAG_MAX_TOTAL:
+    st.error(f"マグの合計値が上限の {MAG_MAX_TOTAL} を超えています！ (現在: {current_total_mag})")
+elif current_total_mag == MAG_MAX_TOTAL:
+     st.success("マグの合計値が上限に達しました。")
+
+
+st.markdown("---")
+# =================================================================
+# 2. クラス選択エリア
+# =================================================================
+
 st.subheader("クラス構成")
     
-# 選択肢はALL_CLASSESの新しい順序に従います
 main_class = st.selectbox(
     "メインクラス",
     options=ALL_CLASSES,
@@ -52,7 +124,6 @@ if main_class in ["Hr", "Ph", "Et", "Lu"]:
     )
     st.session_state['sub_class_select'] = "None" 
 else:
-    # サブクラス候補はメインクラスを除いたもの + "None"
     sub_class_options_filtered = ["None"] + [c for c in SUB_CLASSES_CANDIDATES if c != main_class]
 
     st.selectbox(
@@ -63,13 +134,22 @@ else:
 
 st.markdown("---")
 
-# --- 2. エクスポート/インポート機能 (mysetno) ---
+# =================================================================
+# 3. エクスポート/インポート機能 (in / out)
+# =================================================================
+
 st.subheader("mysetno (エクスポート/インポート)")
 
 export_data = {
+    # 既存のデータ
     "main_class": st.session_state['main_class_select'],
     "sub_class": st.session_state['sub_class_select'],
     "skills": st.session_state['skills_data'], 
+    
+    # 新規追加のデータ (拡張性に対応)
+    "race": st.session_state['race_select'],
+    "mag_stats": st.session_state['mag_stats'], 
+    
     "version": "pso2_dmg_calc_v1"
 }
 
@@ -87,10 +167,23 @@ uploaded_file = st.file_uploader("⬆️ JSONファイルをインポート", ty
 if uploaded_file is not None:
     try:
         data = json.load(uploaded_file)
+        
+        # インポート処理: 拡張されたデータもチェックし、セッションステートにロード
         if "main_class" in data and "sub_class" in data and "skills" in data:
             st.session_state['main_class_select'] = data["main_class"]
             st.session_state['sub_class_select'] = data["sub_class"]
             st.session_state['skills_data'] = data["skills"]
+            
+            # 新規データがあればロード
+            if "race" in data:
+                st.session_state['race_select'] = data["race"]
+            if "mag_stats" in data:
+                st.session_state['mag_stats'] = data["mag_stats"]
+                # マグ入力コンポーネントの表示値を更新するために、個別のキーも更新
+                for field, value in data["mag_stats"].items():
+                    if f"mag_input_{field}" in st.session_state:
+                         st.session_state[f"mag_input_{field}"] = value
+                
             st.success(f"設定をインポートしました。")
             st.rerun() 
         else:
@@ -102,7 +195,10 @@ if uploaded_file is not None:
 
 st.markdown("---")
 
-# --- 3. スキルツリー詳細設定 ---
+# =================================================================
+# 4. スキルツリー詳細設定
+# =================================================================
+
 st.subheader("スキルツリー詳細設定")
 
 # 選択されているメインクラスとサブクラスを取得
@@ -127,5 +223,4 @@ if skill_tabs_list:
             st.write(f"現在、**{class_name}** のスキルツリー設定を表示しています。")
             st.info("スキル名、レベル入力（スライダーまたは数値入力）のUIをここに追加していきます。")
 else:
-    # 本来ありえないが、念のため
     st.warning("クラスが選択されていません。")
