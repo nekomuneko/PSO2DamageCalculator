@@ -80,7 +80,11 @@ st.markdown("---")
 # =================================================================
 
 st.subheader("種族とマグの設定")
-col_race, col_mag_title = st.columns(2)
+col_race, col_mag = st.columns(2) # col_mag_title -> col_mag に変更し、マグのロジック全体をここに格納する
+
+# 合計値の計算とチェック
+current_total_mag = sum(st.session_state['mag_stats'].values())
+MAG_MAX_TOTAL = 200
 
 with col_race:
     # --- 種族選択 ---
@@ -96,38 +100,34 @@ with col_race:
         key="race_select",
     )
 
-with col_mag_title:
-    st.markdown("##### マグステータス (合計 200 まで)")
+with col_mag:
+    # --- マグの合計値を最初に表示 ---
+    st.markdown("##### マグステータス")
+    st.markdown(f"**合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**")
+
+    if current_total_mag > MAG_MAX_TOTAL:
+        st.error(f"マグの合計値が上限の {MAG_MAX_TOTAL} を超えています！")
+    elif current_total_mag == MAG_MAX_TOTAL:
+        st.success("マグの合計値が上限に達しました。", icon="✅")
+
 
 # --- マグの数値入力 (2列で配置) ---
-# 合計値の計算とチェック
-current_total_mag = sum(st.session_state['mag_stats'].values())
-MAG_MAX_TOTAL = 200
-
-mag_cols_1, mag_cols_2, mag_cols_3, mag_cols_4 = st.columns([1, 1, 1, 1])
+# 打撃力/打撃防御, 射撃力/射撃防御, 法撃力/法撃防御, 技量を横に並べるために、4列を使用します
+mag_cols_1, mag_cols_2, mag_cols_3, mag_cols_4 = st.columns(4)
 
 # 入力欄の生成
-for i, field in enumerate(MAG_STATS_FIELDS):
-    # 2列に分けて配置するために、打撃力と打撃防御を1列目/2列目...に交互に配置
-    if i % 2 == 0: # 打撃力, 法撃力, 打撃防御, ...
-        col = mag_cols_1
-    else: # 射撃力, 技量, 射撃防御, ...
-        col = mag_cols_2
-        
-    # 技量と防御ステータスの配置を調整（少し複雑になるため、ここでは元の3列配置を2列に調整するシンプルな方法を一旦維持します）
-    # シンプルな2列配置
-    if i < 4: # 0, 1, 2, 3 (打撃力, 射撃力, 法撃力, 技量)
-        col = mag_cols_1 if i % 2 == 0 else mag_cols_2
-    else: # 4, 5, 6 (打撃防御, 射撃防御, 法撃防御)
-         col = mag_cols_3 if i % 2 == 0 else mag_cols_4
-    
-    # 技量と防御は特殊なので、再配置します
+for field in MAG_STATS_FIELDS:
+    # 打撃力, 射撃力, 法撃力
     if field in ["打撃力", "射撃力", "法撃力"]:
         col = mag_cols_1
+    # 打撃防御, 射撃防御, 法撃防御
     elif field in ["打撃防御", "射撃防御", "法撃防御"]:
         col = mag_cols_2
+    # 技量
     elif field == "技量":
         col = mag_cols_3
+        
+    # 上記の振り分けで使われない col_mag_4 は空けておく
 
     with col:
         # 入力値は0から200に制限
@@ -139,17 +139,11 @@ for i, field in enumerate(MAG_STATS_FIELDS):
             value=st.session_state['mag_stats'].get(field, 0),
             step=1,
             label_visibility="visible",
-            # コールバック: 値が変更されたらセッションステートを更新し、合計をチェック
+            # コールバック: 値が変更されたらセッションステートを更新
             on_change=lambda f=field: st.session_state['mag_stats'].__setitem__(f, st.session_state[f"mag_input_{f}"])
         )
 
-# 合計値の表示とチェック (マグ入力の下に集約)
-st.markdown(f"**現在のマグ合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**")
-
-if current_total_mag > MAG_MAX_TOTAL:
-    st.error(f"マグの合計値が上限の {MAG_MAX_TOTAL} を超えています！ (現在: {current_total_mag})")
-elif current_total_mag == MAG_MAX_TOTAL:
-     st.success("マグの合計値が上限に達しました。", icon="✅")
+# 合計値の表示とチェックは col_mag 内に移動済みのため、この下は削除
 
 st.markdown("---")
 
@@ -282,3 +276,4 @@ if skill_tabs_list:
             st.info("ここにスキル名とレベル入力（スライダーまたは数値入力）のUIが入ります。")
 else:
     st.warning("クラスが選択されていません。")
+
