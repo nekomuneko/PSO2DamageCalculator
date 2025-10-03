@@ -75,6 +75,7 @@ if 'race_select' not in st.session_state: st.session_state['race_select'] = "ヒ
 if 'mag_stats' not in st.session_state: 
     st.session_state['mag_stats'] = {field: 0 for field in MAG_STATS_FIELDS}
 if 'class_boost_enabled' not in st.session_state: st.session_state['class_boost_enabled'] = True 
+# ※ 'custom_skill_additions' のセッションステートは削除済み
 
 # =================================================================
 # 2. 計算関数 (確定ロジック: 全ステップ切り捨て適用)
@@ -131,7 +132,6 @@ def get_calculated_stats():
             sub_contribution = 0
             
             # サブクラスが設定されており、かつメインクラスが後継クラスではない場合
-            # メインクラスが後継クラスの場合、sub_class_selectは強制的に'None'になるため、このチェックは不要だが、念のため。
             if sub_class_select != 'None':
                 sub_cor = CLASS_CORRECTIONS.get(sub_class_select, {})
                 sub_class_multiplier = sub_cor.get(stat_name, 1.0)
@@ -154,6 +154,8 @@ def get_calculated_stats():
         # クラスブースト増加分 (全ステータス共通)
         total_value += CB_BONUS.get(stat_name, 0)
         
+        # ※ ここにスキル固定値加算のロジックは意図的に削除されています。
+        
         calculated_stats[stat_name] = total_value
         
     return calculated_stats
@@ -162,7 +164,7 @@ def get_calculated_stats():
 # Streamlit UI
 # =================================================================
 
-st.title("📚 1. Skill Tree 設定")
+st.title("📚 1. クラス・マグ 設定")
 
 # =================================================================
 # 1. クラス構成 (クラス / サブクラス)
@@ -239,11 +241,13 @@ st.selectbox(
 st.markdown("---")
 
 # =================================================================
-# 3. マグ設定
+# 3. マグ設定とクラスブースト
 # =================================================================
 
-st.subheader("マグ設定")
+st.subheader("マグ/クラスブースト設定")
 
+# --- マグの入力 ---
+st.markdown("##### マグのステータス")
 # 合計値の計算とチェック
 current_total_mag = sum(st.session_state['mag_stats'].values())
 MAG_MAX_TOTAL = 200
@@ -259,54 +263,29 @@ elif current_total_mag == MAG_MAX_TOTAL:
 # マグの数値入力 (3列で配置)
 mag_cols = st.columns(3) 
 
-# 入力欄の生成 (打撃力, 射撃力, 法撃力)
-for i, field in enumerate(["打撃力", "射撃力", "法撃力"]):
-    with mag_cols[0]:
-        st.number_input(
-            field,
-            min_value=0,
-            max_value=MAG_MAX_TOTAL, 
-            key=f"mag_input_{field}",
-            value=st.session_state['mag_stats'].get(field, 0),
-            step=1,
-            label_visibility="visible",
-            on_change=lambda f=field: st.session_state['mag_stats'].__setitem__(f, st.session_state[f"mag_input_{f}"])
-        )
+mag_fields = [
+    ["打撃力", "射撃力", "法撃力"],
+    ["打撃防御", "射撃防御", "法撃防御"],
+    ["技量"]
+]
 
-# 入力欄の生成 (打撃防御, 射撃防御, 法撃防御)
-for i, field in enumerate(["打撃防御", "射撃防御", "法撃防御"]):
-    with mag_cols[1]:
-        st.number_input(
-            field,
-            min_value=0,
-            max_value=MAG_MAX_TOTAL, 
-            key=f"mag_input_{field}",
-            value=st.session_state['mag_stats'].get(field, 0),
-            step=1,
-            label_visibility="visible",
-            on_change=lambda f=field: st.session_state['mag_stats'].__setitem__(f, st.session_state[f"mag_input_{f}"])
-        )
-
-# 入力欄の生成 (技量)
-with mag_cols[2]:
-    field = "技量"
-    st.number_input(
-        field,
-        min_value=0,
-        max_value=MAG_MAX_TOTAL, 
-        key=f"mag_input_{field}",
-        value=st.session_state['mag_stats'].get(field, 0),
-        step=1,
-        label_visibility="visible",
-        on_change=lambda f=field: st.session_state['mag_stats'].__setitem__(f, st.session_state[f"mag_input_{f}"])
-    )
-
-st.markdown("---")
+for col_idx, fields in enumerate(mag_fields):
+    with mag_cols[col_idx]:
+        for field in fields:
+            # st.number_inputのキーとセッションステートの更新ロジックを修正 (一括更新)
+            st.number_input(
+                field,
+                min_value=0,
+                max_value=MAG_MAX_TOTAL, 
+                key=f"mag_input_{field}",
+                value=st.session_state['mag_stats'].get(field, 0),
+                step=1,
+                label_visibility="visible",
+                on_change=lambda f=field: st.session_state['mag_stats'].__setitem__(f, st.session_state[f"mag_input_{f}"])
+            )
 
 # --- クラスブースト設定 ---
-st.subheader("クラスブースト設定")
-
-# クラスブーストチェックボックス
+st.markdown("##### クラスブースト")
 st.checkbox(
     "クラスブースト（全クラスLv75達成）",
     key="class_boost_enabled",
@@ -323,9 +302,9 @@ st.markdown("---")
 # 補正込みの合計値を計算
 total_stats = get_calculated_stats()
 
-st.subheader("合計基本ステータス (計算式適用後)")
+st.subheader("合計基本ステータス (最終理論値)")
 
-st.markdown(f"##### (Lv100基礎値 ({NEW_BASE_STATS['打撃力']}など) + 種族/クラス補正 + クラスブースト + マグ)")
+st.markdown(f"##### (Lv100基礎値 + 種族/クラス補正 + マグ + クラスブースト)")
 st.caption(f"※ 計算は**全ステップで厳密に切り捨て ($\text{{INT}}$) を適用**しています。")
 
 # ステータス表示を整頓
@@ -362,7 +341,8 @@ export_data = {
     "race": st.session_state['race_select'],
     "mag_stats": st.session_state['mag_stats'], 
     "class_boost_enabled": st.session_state['class_boost_enabled'],
-    "version": "pso2_dmg_calc_v15_hr_sub_fix" # バージョン名を更新
+    # ※ 'custom_skill_additions' は削除済み
+    "version": "pso2_dmg_calc_v18_reverted" # バージョン名を更新
 }
 
 export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
@@ -400,6 +380,8 @@ if uploaded_file is not None:
                          
             if "class_boost_enabled" in data:
                 st.session_state['class_boost_enabled'] = data["class_boost_enabled"]
+            
+            # ※ 固定値加算のインポート処理は削除済み
 
             st.success(f"設定をインポートしました。")
             st.rerun() 
@@ -416,7 +398,7 @@ st.markdown("---")
 # 6. スキルツリー詳細設定
 # =================================================================
 
-st.subheader("スキルツリー詳細設定")
+st.subheader("スキルツリー詳細設定 (未実装)")
 
 main_class_name = st.session_state.get('main_class_select', 'Hu')
 sub_class_name = st.session_state.get('sub_class_select', 'None')
@@ -434,6 +416,6 @@ if skill_tabs_list:
             st.header(f"{class_name} スキル設定")
             
             st.write(f"現在、**{class_name}** のスキルツリー設定を表示しています。")
-            st.info("ここにスキル名とレベル入力（スライダーまたは数値入力）のUIが入り、そのスキル効果が上記の基本ステータスやダメージ計算に反映されます。（未実装）")
+            st.info("ここにスキル名とレベル入力のUIが入り、その効果がダメージ計算に反映されます。")
 else:
     st.warning("クラスが選択されていません。")
