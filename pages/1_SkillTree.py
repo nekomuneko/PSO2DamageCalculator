@@ -40,6 +40,15 @@ CLASS_CORRECTIONS = {
     "Et": {"HP": 1.26, "PP": 1.00, "打撃力": 1.25, "射撃力": 1.25, "法撃力": 1.25, "技量": 1.31, "打撃防御": 1.62, "射撃防御": 1.62, "法撃防御": 1.62}, # エトワール
     "Lu": {"HP": 1.22, "PP": 1.00, "打撃力": 1.27, "射撃力": 1.27, "法撃力": 1.27, "技量": 1.39, "打撃防御": 1.58, "射撃防御": 1.58, "法撃防御": 1.58}, # ラスター
 }
+
+# --- クラスブーストの固定値 (全クラスLv75達成時のボーナス) ---
+CLASS_BOOST_BONUS = {
+    "HP": 60, 
+    "PP": 10, 
+    "打撃力": 120, "射撃力": 120, "法撃力": 120, 
+    "技量": 60, 
+    "打撃防御": 90, "射撃防御": 90, "法撃防御": 90
+}
 # -------------------------------------------------------------------
 
 # --- マグのステータス定義 ---
@@ -79,13 +88,9 @@ if 'race_select' not in st.session_state:
 if 'mag_stats' not in st.session_state:
     st.session_state['mag_stats'] = {field: 0 for field in MAG_STATS_FIELDS}
 
-# --- 新規追加: 加算ボーナス ---
-# クラスブースト (+10) やS級特殊能力、クラススキルなどによる加算値
-if 'additive_atk_acc_bonus' not in st.session_state:
-    # デフォルトでクラスブースト分の +10 を想定
-    st.session_state['additive_atk_acc_bonus'] = 10 
-if 'additive_def_bonus' not in st.session_state:
-    st.session_state['additive_def_bonus'] = 0 
+# --- クラスブーストON/OFF ---
+if 'class_boost_enabled' not in st.session_state:
+    st.session_state['class_boost_enabled'] = True # デフォルトでONにしておく
 # --------------------------------------------------
 
 # -------------------------------------------------------------------
@@ -101,8 +106,8 @@ SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
 
 def get_calculated_stats():
     """
-    ユーザー入力、種族補正、クラス補正、マグ補正、加算ボーナスを合算した基本ステータスを計算します。
-    計算式: INT(基礎値 * 種族補正 * メイン補正) + INT(サブクラス値 * 0.2) + 加算ボーナス
+    ユーザー入力、種族補正、クラス補正、マグ補正、クラスブーストを合算した基本ステータスを計算します。
+    計算式: INT(基礎値 * 種族補正 * メイン補正) + INT(サブクラス値 * 0.2) + クラスブースト + マグ
     """
     
     # 選択されている設定の取得
@@ -121,10 +126,9 @@ def get_calculated_stats():
     BASE_ACCURACY_VAL = st.session_state['base_accuracy_val']
     BASE_HP = st.session_state['base_hp']
     BASE_PP = st.session_state['base_pp']
-    
-    # 加算ボーナス
-    ADDITIVE_ATK_ACC_BONUS = st.session_state['additive_atk_acc_bonus']
-    ADDITIVE_DEF_BONUS = st.session_state['additive_def_bonus']
+        
+    # クラスブーストボーナス
+    CB_BONUS = CLASS_BOOST_BONUS if st.session_state['class_boost_enabled'] else {k: 0 for k in CLASS_BOOST_BONUS.keys()}
     
     calculated_stats = {}
 
@@ -150,29 +154,27 @@ def get_calculated_stats():
         main_contribution = int(base_val * race_multiplier * main_class_multiplier)
         total_value = main_contribution
 
-        # 2. サブクラス貢献分 (ATK/DEF/ACCのみ)
+        # 2. サブクラス貢献分 (ATK/DEF/ACCのみ、Hr/Ph/Et/Luはサブクラス設定不可)
         if base_stat_type in ['atk', 'def', 'acc'] and sub_class_select != 'None':
             sub_cor = CLASS_CORRECTIONS.get(sub_class_select, {})
             sub_class_multiplier = sub_cor.get(stat_name, 1.0)
 
             # サブクラス値: INT(基礎値 * 種族補正 * サブクラス補正)
-            # 既にメインクラス補正として使われた基礎値ではなく、改めて計算する
             sub_class_stat_value = int(base_val * race_multiplier * sub_class_multiplier)
             
             # サブクラス貢献分: INT(サブクラス値 * 0.2)
             sub_contribution = int(sub_class_stat_value * 0.2)
             total_value += sub_contribution
             
-        # 3. マグ増加分 (ATK/DEF/ACCのみ)
-        if base_stat_type in ['atk', 'def', 'acc']:
+        # 3. マグ増加分 (ATK/DEF/ACC/技量のみ)
+        if stat_name in mag_stats: # 攻撃力、防御力、技量にマグボーナスを適用
             mag_bonus = mag_stats.get(stat_name, 0)
             total_value += mag_bonus
 
-        # 4. クラスブースト/S級特殊能力増加分 (加算ボーナス)
-        if base_stat_type in ['atk', 'acc']:
-             total_value += ADDITIVE_ATK_ACC_BONUS
-        elif base_stat_type == 'def':
-             total_value += ADDITIVE_DEF_BONUS
+        # 4. クラスブースト増加分 (全ステータス)
+        total_value += CB_BONUS.get(stat_name, 0)
+        
+        # 5. その他の加算ボーナスは削除されました。
 
         return total_value
 
@@ -182,7 +184,7 @@ def get_calculated_stats():
         "打撃力": 'atk', "射撃力": 'atk', "法撃力": 'atk',
         "打撃防御": 'def', "射撃防御": 'def', "法撃防御": 'def',
         "技量": 'acc',
-        "HP": 'hp', "PP": 'pp' # HP/PPはサブクラス・マグ・加算ボーナスの影響を受けない（スキルツリー設定で後で考慮）
+        "HP": 'hp', "PP": 'pp' 
     }
 
     for stat, base_type in stat_mapping.items():
@@ -381,34 +383,18 @@ with mag_cols[2]:
 
 st.markdown("---")
 
-# --- 加算ボーナスセクション ---
-st.subheader("その他の加算ボーナス")
-st.markdown("##### (クラスブースト、S級特殊能力、クラススキルによる加算値)")
+# --- クラスブースト設定 ---
+st.subheader("加算ボーナス設定")
 
-col_add_atk, col_add_def = st.columns(2)
+# クラスブーストチェックボックス
+st.checkbox(
+    "クラスブースト（全クラスLv75達成）",
+    key="class_boost_enabled",
+    value=st.session_state['class_boost_enabled'],
+    help="チェックを入れると、HP+60, PP+10, 攻撃力+120, 技量+60, 防御力+90が加算されます。"
+)
 
-with col_add_atk:
-    st.number_input(
-        "攻撃・技量 (打/射/法/技量)",
-        min_value=0,
-        max_value=999,
-        key="additive_atk_acc_bonus",
-        value=st.session_state['additive_atk_acc_bonus'],
-        step=1,
-        help="クラスブーストやS級特殊能力、攻撃系クラススキルなどによる加算ボーナスを入力します。（例：クラスブースト+10）"
-    )
-
-with col_add_def:
-    st.number_input(
-        "防御力 (打防/射防/法防)",
-        min_value=0,
-        max_value=999,
-        key="additive_def_bonus",
-        value=st.session_state['additive_def_bonus'],
-        step=1,
-        help="防御系クラススキルなどによる加算ボーナスを入力します。"
-    )
-
+# その他の加算ボーナスのUIは削除しました。
 st.markdown("---")
 
 # =================================================================
@@ -420,7 +406,7 @@ total_stats = get_calculated_stats()
 
 st.subheader("合計基本ステータス (計算式適用後)")
 
-st.markdown("##### (メインクラス補正 + サブクラス補正(0.2倍) + マグ + 加算ボーナス)")
+st.markdown("##### (メインクラス + サブクラス(0.2倍) + クラスブースト + マグ)")
 
 col_atk, col_def = st.columns(2)
 
@@ -435,7 +421,7 @@ col_atk, col_def = st.columns(2)
 with col_atk:
     st.metric(label="射撃力 (Total)", value=f"{total_stats['射撃力']}")
 with col_def:
-    st.metric(label="射撃防御 (Total)", value=f"{total_stats['打撃防御']}")
+    st.metric(label="射撃防御 (Total)", value=f"{total_stats['射撃防御']}")
 
 # 法撃力 / 法撃防御
 col_atk, col_def = st.columns(2)
@@ -450,10 +436,9 @@ st.metric(label="技量 (Total)", value=f"{total_stats['技量']}")
 # HP/PP
 col_hp, col_pp = st.columns(2)
 with col_hp:
-    # HP/PPはサブクラス・マグ・加算ボーナスの影響をここでは受けないシンプルな計算
-    st.metric(label="合計HP (基礎 + 種族 + クラス)", value=f"{total_stats['HP']}")
+    st.metric(label="合計HP", value=f"{total_stats['HP']}")
 with col_pp:
-    st.metric(label="合計PP (基礎 + 種族 + クラス)", value=f"{total_stats['PP']}")
+    st.metric(label="合計PP", value=f"{total_stats['PP']}")
 
 
 st.markdown("---")
@@ -480,11 +465,12 @@ export_data = {
     "race": st.session_state['race_select'],
     "mag_stats": st.session_state['mag_stats'], 
     
-    # 新しい加算ボーナス値
-    "additive_atk_acc_bonus": st.session_state['additive_atk_acc_bonus'],
-    "additive_def_bonus": st.session_state['additive_def_bonus'],
+    # クラスブースト設定値
+    "class_boost_enabled": st.session_state['class_boost_enabled'],
     
-    "version": "pso2_dmg_calc_v2"
+    # 削除された加算ボーナスは含めません
+    
+    "version": "pso2_dmg_calc_v4"
 }
 
 export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
@@ -533,11 +519,11 @@ if uploaded_file is not None:
                     if f"mag_input_{field}" in st.session_state:
                          st.session_state[f"mag_input_{field}"] = value
                          
-            # 加算ボーナスのインポート
-            if "additive_atk_acc_bonus" in data:
-                st.session_state['additive_atk_acc_bonus'] = data["additive_atk_acc_bonus"]
-            if "additive_def_bonus" in data:
-                st.session_state['additive_def_bonus'] = data["additive_def_bonus"]
+            # クラスブーストのインポート
+            if "class_boost_enabled" in data:
+                st.session_state['class_boost_enabled'] = data["class_boost_enabled"]
+
+            # 削除された加算ボーナスはインポートしない
                 
             st.success(f"設定をインポートしました。")
             st.rerun() 
