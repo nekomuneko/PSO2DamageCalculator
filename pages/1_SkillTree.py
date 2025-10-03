@@ -2,10 +2,24 @@
 
 import streamlit as st
 import json
-import base64
 from pathlib import Path 
 
 st.set_page_config(layout="wide")
+
+# 🚨 デバッグ用CSSの追加
+# 画像が小さすぎたり透明で表示されているかを確認するため、赤い枠線を強制的に追加します。
+st.markdown(
+    """
+    <style>
+    /* Streamlitでst.imageが生成する要素に境界線を適用 */
+    .stImage > img {
+        border: 2px solid red !important; /* 赤い境界線を強制的に表示 */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+# -----------------------------
 
 # --- セッションステートの初期化 (KeyError対策) ---
 if 'main_class_select' not in st.session_state:
@@ -27,10 +41,8 @@ PROJECT_ROOT = SCRIPT_DIR.parent.resolve()
 
 # -------------------------------------------------------------------
 # クラス名とファイル名のみの対応付け
-# NONE_IMAGE_FILENAMEの定義は削除しました
 # -------------------------------------------------------------------
 CLASS_IMAGES = {
-    # 値はファイル名のみ
     "Bo": "Bo.png", "Br": "Br.png", "Et": "Et.png",
     "Fi": "Fi.png", "Fo": "Fo.png", "Gu": "Gu.png",
     "Hr": "Hr.png", "Hu": "Hu.png", "Lu": "Lu.png",
@@ -79,8 +91,8 @@ with tab1:
             
         # 画像データがある場合のみ表示
         if image_to_display is not None:
-            st.image(image_to_display, width=64, output_format="PNG")
-        # else: 画像がない場合は何も表示しない（空白になる）
+            # 🚨 修正点: widthを256に拡大
+            st.image(image_to_display, width=256) 
         
     with col_main_select:
         main_class = st.selectbox(
@@ -97,7 +109,7 @@ with tab1:
         
         col_sub_img, col_sub_select = st.columns([1, 4])
         with col_sub_img:
-            # None のため、ここでは何も画像を表示しない
+            # None のため、何も画像を表示しない
             pass
         with col_sub_select:
             st.selectbox(
@@ -118,7 +130,7 @@ with tab1:
             selected_sub_class = st.session_state.get('sub_class_select', 'None')
             
             if selected_sub_class == "None":
-                 # None のため、ここでは何も画像を表示しない
+                 # None のため、何も画像を表示しない
                  image_to_display = None
             else:
                  image_filename = CLASS_IMAGES.get(selected_sub_class)
@@ -126,7 +138,8 @@ with tab1:
             
             # 画像データがある場合のみ表示
             if image_to_display is not None:
-                st.image(image_to_display, width=64, output_format="PNG")
+                # 🚨 修正点: widthを256に拡大
+                st.image(image_to_display, width=256)
 
         with col_sub_select:
             st.selectbox(
@@ -178,5 +191,6 @@ with tab1:
 with tab2:
     st.subheader("スキルツリー詳細設定")
     st.write("スキル配分などの詳細設定をここに追加します。")
+
 
 
