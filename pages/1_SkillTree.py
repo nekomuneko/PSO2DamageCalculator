@@ -2,8 +2,7 @@
 
 import streamlit as st
 import json
-# pathlibは現在使用されていないため削除しました
-# from pathlib import Path 
+# from pathlib import Path  # 現在使用されていないため削除
 
 st.set_page_config(layout="wide")
 
@@ -23,7 +22,7 @@ if 'enemy_def' not in st.session_state:
 # -------------------------------------------------------------------
 # クラス定義 (画像関連のコードはすべて削除されました)
 # -------------------------------------------------------------------
-ALL_CLASSES = ["Hu", "Fi", "Ra", "Gu", "Fo", "Te", "Br", "Bo", "Su", "Hr", "Ph", "Et", "Lu"]
+ALL_CLASSES = ["Bo", "Br", "Et", "Fi", "Fo", "Gu", "Hr", "Hu", "Lu", "Ph", "Ra", "Su", "Te"]
 SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
 # -------------------------------------------------------------------
 
@@ -35,7 +34,7 @@ tab1, tab2 = st.tabs(["myset", "skill tree"])
 with tab1:
     st.subheader("クラス構成とデータ管理 (myset)")
     
-    # --- クラス選択エリア (画像表示なしのシンプルな形) ---
+    # --- クラス選択エリア ---
     
     main_class = st.selectbox(
         "メインクラス",
@@ -106,5 +105,30 @@ with tab1:
 
 with tab2:
     st.subheader("スキルツリー詳細設定")
-    st.write("スキル配分などの詳細設定をここに追加します。")
+    
+    # --- 動的スキルツリータブの生成 ---
+    
+    # 選択されているメインクラスとサブクラスを取得
+    main_class_name = st.session_state.get('main_class_select', 'Hu')
+    sub_class_name = st.session_state.get('sub_class_select', 'None')
+    
+    # タブのリストを Main / Sub の順で作成
+    skill_tabs_list = [main_class_name]
+    if sub_class_name != 'None':
+        skill_tabs_list.append(sub_class_name)
 
+    if skill_tabs_list:
+        # st.tabs() を使用してタブオブジェクトを生成
+        skill_tab_objects = st.tabs(skill_tabs_list)
+
+        # 各タブの内容をループで生成
+        for i, class_name in enumerate(skill_tabs_list):
+            with skill_tab_objects[i]:
+                st.header(f"{class_name} スキル設定")
+                
+                # ここに、スキル名とスライダーなどのUIが入ります
+                st.write(f"現在、**{class_name}** のスキルツリー設定を表示しています。")
+                st.info("スキル名、レベル入力（スライダーまたは数値入力）のUIをここに追加していきます。")
+    else:
+        # 本来ありえないが、念のため
+        st.warning("クラスが選択されていません。mysetタブでクラスを選択してください。")
