@@ -1,70 +1,55 @@
-# pages/1_SkillTree.py
-
 import streamlit as st
 import json
 import base64
-# import os # 削除
-# from pathlib import Path # 削除
+# os, pathlib のインポートは不要です。
 
 st.set_page_config(layout="wide")
 
-# --- ファイルパスの基点を設定 ---
-# 絶対パス構築ロジックをすべて削除
-
 # -------------------------------------------------------------------
-# クラス名と画像ファイルパスの対応付け (相対パスに復帰)
+# クラス名と画像ファイルパスの対応付け (相対パスを使用)
 # -------------------------------------------------------------------
 CLASS_IMAGES = {
-    # すべてのクラスのパスを "images/クラス名.png" の形式に戻す
-    "Hu": "images/Hu.png", 
-    "Fi": "images/Fi.png",
-    "Ra": "images/Ra.png",
-    "Gu": "images/Gu.png",
-    "Fo": "images/Fo.png",
-    "Te": "images/Te.png",
-    "Br": "images/Br.png",
+    # ファイル名と完全に一致させてください: images/Hu.png, images/Fi.png など
     "Bo": "images/Bo.png",
-    "Su": "images/Su.png",
-    "Hr": "images/Hr.png",
-    "Ph": "images/Ph.png",
+    "Br": "images/Br.png",
     "Et": "images/Et.png",
+    "Fi": "images/Fi.png",
+    "Fo": "images/Fo.png",
+    "Gu": "images/Gu.png",
+    "Hr": "images/Hr.png",
+    "Hu": "images/Hu.png",
     "Lu": "images/Lu.png",
+    "Ph": "images/Ph.png",
+    "Ra": "images/Ra.png",
+    "Su": "images/Su.png",
+    "Te": "images/Te.png",
 }
-
+# Noneが選択された時のダミー画像 (このファイルもimagesフォルダにアップロードしてください)
+NONE_IMAGE_PATH = "images/None.png" 
 # -------------------------------------------------------------------
 
-# 全てのクラス定義
+# 全てのクラス定義 (CLASS_IMAGESのキーから取得)
 ALL_CLASSES = list(CLASS_IMAGES.keys())
-# サブクラスとして選択可能なクラス (Hrは除外)
+# サブクラスとして選択可能なクラス (Hrはサブクラス設定不可のため除外)
 SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
 
 st.title("📚 1. Skill Tree 設定")
 
-# セッションステートの初期化 (前回のコードから変更なし)
-if 'main_class_select' not in st.session_state:
-    st.session_state['main_class_select'] = "Hu"
-if 'sub_class_select' not in st.session_state:
-    st.session_state['sub_class_select'] = "None"
-if 'skills_data' not in st.session_state:
-    st.session_state['skills_data'] = {}
-
-
-# タブの作成
+# --- タブの作成 ---
 tab1, tab2 = st.tabs(["myset", "skill tree"])
 
 with tab1:
     st.subheader("クラス構成とデータ管理 (myset)")
     
-    # -----------------------------------------------------
-    # 1. クラス選択エリア (画像表示を追加)
-    # -----------------------------------------------------
+    # --- クラス選択エリア ---
     
     col_main_img, col_main_select = st.columns([1, 4])
     
     with col_main_img:
         # メインクラスの画像表示
         selected_main_class = st.session_state['main_class_select']
-        st.image(CLASS_IMAGES.get(selected_main_class, ""), width=64)
+        image_to_display = CLASS_IMAGES.get(selected_main_class, NONE_IMAGE_PATH)
+        st.image(image_to_display, width=64)
         
     with col_main_select:
         # メインクラスの選択 (全クラスから選択可能)
@@ -72,20 +57,20 @@ with tab1:
             "メインクラス",
             options=ALL_CLASSES,
             key="main_class_select",
-            label_visibility="collapsed" # ラベルを非表示にし、画像と並べる
+            label_visibility="collapsed"
         )
     
-    # サブクラスのオプションを動的に決定 (ロジックは前回と同じ)
+    # --- サブクラスのオプションロジック ---
     
-    # Hr, Ph, Et, Lu がメインクラスの場合
+    # Hr, Ph, Et, Lu がメインクラスの場合 (サブクラス不可)
     if main_class in ["Hr", "Ph", "Et", "Lu"]:
         st.info(f"{main_class}は後継クラスのため、サブクラスを設定できません。")
         
-        # サブクラスは"None"固定、選択不可
         col_sub_img, col_sub_select = st.columns([1, 4])
         with col_sub_img:
-            st.image("https://dummyimage.com/64x64/aaaaaa/000000&text=None", width=64) # Noneアイコン
+            st.image(NONE_IMAGE_PATH, width=64)
         with col_sub_select:
+            # サブクラスは"None"固定、選択不可
             st.selectbox(
                 "サブクラス",
                 options=["None"],
@@ -97,17 +82,19 @@ with tab1:
         st.session_state['sub_class_select'] = "None" 
     else:
         # メインクラスが後継クラスではない場合
+        # サブクラスの候補は、Hrを除いた全クラスから、メインクラス自身を除外
         sub_class_options_filtered = ["None"] + [c for c in SUB_CLASSES_CANDIDATES if c != main_class]
 
         col_sub_img, col_sub_select = st.columns([1, 4])
         
         with col_sub_img:
-            # サブクラスの画像表示 (選択中の値に基づく)
+            # サブクラスの画像表示
             selected_sub_class = st.session_state.get('sub_class_select', 'None')
             if selected_sub_class == "None":
-                 st.image("https://dummyimage.com/64x64/aaaaaa/000000&text=None", width=64)
+                 image_to_display = NONE_IMAGE_PATH
             else:
-                 st.image(CLASS_IMAGES.get(selected_sub_class, ""), width=64)
+                 image_to_display = CLASS_IMAGES.get(selected_sub_class, NONE_IMAGE_PATH)
+            st.image(image_to_display, width=64)
 
         with col_sub_select:
             st.selectbox(
@@ -119,13 +106,9 @@ with tab1:
 
     st.markdown("---")
 
-    # -----------------------------------------------------
-    # 2. エクスポート/インポート機能エリア (mysetno)
-    # -----------------------------------------------------
-    
+    # --- エクスポート/インポート機能 (mysetno) ---
     st.subheader("mysetno (エクスポート/インポート)")
 
-    # (エクスポート/インポートのロジックは前回と同じため省略せず、そのまま残します)
     export_data = {
         "main_class": st.session_state['main_class_select'],
         "sub_class": st.session_state['sub_class_select'],
@@ -147,13 +130,11 @@ with tab1:
     if uploaded_file is not None:
         try:
             data = json.load(uploaded_file)
-            
             if "main_class" in data and "sub_class" in data and "skills" in data:
                 st.session_state['main_class_select'] = data["main_class"]
                 st.session_state['sub_class_select'] = data["sub_class"]
                 st.session_state['skills_data'] = data["skills"]
-                
-                st.success(f"設定をインポートしました: メイン={data['main_class']}, サブ={data['sub_class']}")
+                st.success(f"設定をインポートしました。")
                 st.rerun() 
             else:
                 st.error("インポートされたJSONファイルが必要なキーを含んでいません。")
@@ -164,5 +145,4 @@ with tab1:
 
 with tab2:
     st.subheader("スキルツリー詳細設定")
-
-    st.write("スキル配分などの設定は、ここに追加されます。")
+    st.write("スキル配分などの詳細設定をここに追加します。")
