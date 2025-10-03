@@ -3,6 +3,8 @@
 import streamlit as st
 import json
 import base64
+import os
+from pathlib import Path 
 
 st.set_page_config(layout="wide")
 
@@ -13,26 +15,52 @@ if 'sub_class_select' not in st.session_state:
     st.session_state['sub_class_select'] = "None"
 if 'skills_data' not in st.session_state:
     st.session_state['skills_data'] = {}
+# 'gear_weapon_atk' と 'enemy_def' もメインページで使用されるため、ここで初期化
+if 'gear_weapon_atk' not in st.session_state:
+    st.session_state['gear_weapon_atk'] = 2000
+if 'enemy_def' not in st.session_state:
+    st.session_state['enemy_def'] = 1000
 # --------------------------------------------------
 
+# --- ファイルパスの基点を設定 (Streamlit Cloud対応) ---
+# スクリプトの親ディレクトリ（プロジェクトルート）を特定
+SCRIPT_DIR = Path(__file__).parent.resolve()
+PROJECT_ROOT = SCRIPT_DIR.parent.resolve() 
+# --------------------------------------------------------
+
 # -------------------------------------------------------------------
-# クラス名と画像ファイルパスの対応付け (相対パスを使用)
+# クラス名とファイル名のみの対応付け
 # -------------------------------------------------------------------
 CLASS_IMAGES = {
-    # ファイル名と完全に一致させてください: images/Hu.png, images/Fi.png など
-    "Bo": "images/Bo.png", "Br": "images/Br.png", "Et": "images/Et.png",
-    "Fi": "images/Fi.png", "Fo": "images/Fo.png", "Gu": "images/Gu.png",
-    "Hr": "images/Hr.png", "Hu": "images/Hu.png", "Lu": "images/Lu.png",
-    "Ph": "images/Ph.png", "Ra": "images/Ra.png", "Su": "images/Su.png",
-    "Te": "images/Te.png"
+    # 値はファイル名のみ
+    "Bo": "Bo.png", "Br": "Br.png", "Et": "Et.png",
+    "Fi": "Fi.png", "Fo": "Fo.png", "Gu": "Gu.png",
+    "Hr": "Hr.png", "Hu": "Hu.png", "Lu": "Lu.png",
+    "Ph": "Ph.png", "Ra": "Ra.png", "Su": "Su.png",
+    "Te": "Te.png"
 }
-# Noneが選択された時、および画像が見つからない時のフォールバックパス
-NONE_IMAGE_PATH = "images/None.png" 
+NONE_IMAGE_FILENAME = "None.png" 
 # -------------------------------------------------------------------
+
+# --- 画像をバイトデータとして読み込むヘルパー関数 ---
+@st.cache_data
+def get_image_bytes(filename: str):
+    """画像を絶対パスで読み込み、バイトデータを返す"""
+    image_path = PROJECT_ROOT / "images" / filename
+    
+    if not image_path.exists():
+        # st.error(f"ファイルが見つかりません: {image_path}") # デバッグ用
+        return None
+    
+    try:
+        with open(image_path, "rb") as f:
+            return f.read()
+    except Exception:
+        # st.error(f"ファイル読み込みエラー: {image_path}") # デバッグ用
+        return None
 
 # 全てのクラス定義
 ALL_CLASSES = list(CLASS_IMAGES.keys())
-# サブクラスとして選択可能なクラス (Hrはサブクラス設定不可のため除外)
 SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
 
 st.title("📚 1. Skill Tree 設定")
@@ -48,13 +76,19 @@ with tab1:
     col_main_img, col_main_select = st.columns([1, 4])
     
     with col_main_img:
-        # メインクラスの画像表示 (フォールバックをNONE_IMAGE_PATHに設定)
         selected_main_class = st.session_state['main_class_select']
-        image_to_display = CLASS_IMAGES.get(selected_main_class, NONE_IMAGE_PATH)
-        st.image(image_to_display, width=64)
+        image_filename = CLASS_IMAGES.get(selected_main_class)
+        
+        # バイトデータを取得
+        image_to_display = get_image_bytes(image_filename)
+            
+        # 取得に失敗した場合、ダミー画像を使用
+        if image_to_display is None:
+            image_to_display = get_image_bytes(NONE_IMAGE_FILENAME)
+            
+        st.image(image_to_display, width=64) # バイトデータをst.imageに渡す
         
     with col_main_select:
-        # メインクラスの選択
         main_class = st.selectbox(
             "メインクラス",
             options=ALL_CLASSES,
@@ -64,15 +98,14 @@ with tab1:
     
     # --- サブクラスのオプションロジック ---
     
-    # Hr, Ph, Et, Lu がメインクラスの場合 (サブクラス不可)
     if main_class in ["Hr", "Ph", "Et", "Lu"]:
         st.info(f"{main_class}は後継クラスのため、サブクラスを設定できません。")
         
         col_sub_img, col_sub_select = st.columns([1, 4])
         with col_sub_img:
-            st.image(NONE_IMAGE_PATH, width=64)
+            # 後継クラスはNONE画像を表示
+            st.image(get_image_bytes(NONE_IMAGE_FILENAME), width=64)
         with col_sub_select:
-            # サブクラスは"None"固定、選択不可
             st.selectbox(
                 "サブクラス",
                 options=["None"],
@@ -83,20 +116,23 @@ with tab1:
             )
         st.session_state['sub_class_select'] = "None" 
     else:
-        # メインクラスが後継クラスではない場合
-        # サブクラスの候補は、Hrを除いた全クラスから、メインクラス自身を除外
         sub_class_options_filtered = ["None"] + [c for c in SUB_CLASSES_CANDIDATES if c != main_class]
 
         col_sub_img, col_sub_select = st.columns([1, 4])
         
         with col_sub_img:
-            # サブクラスの画像表示 (フォールバックをNONE_IMAGE_PATHに設定)
             selected_sub_class = st.session_state.get('sub_class_select', 'None')
+            
             if selected_sub_class == "None":
-                 image_to_display = NONE_IMAGE_PATH
+                 image_to_display = get_image_bytes(NONE_IMAGE_FILENAME)
             else:
-                 # ここでも、フォールバックを NONE_IMAGE_PATH に指定
-                 image_to_display = CLASS_IMAGES.get(selected_sub_class, NONE_IMAGE_PATH)
+                 image_filename = CLASS_IMAGES.get(selected_sub_class)
+                 image_to_display = get_image_bytes(image_filename)
+            
+            # 取得に失敗した場合、ダミー画像を使用
+            if image_to_display is None:
+                image_to_display = get_image_bytes(NONE_IMAGE_FILENAME)
+                
             st.image(image_to_display, width=64)
 
         with col_sub_select:
@@ -149,5 +185,6 @@ with tab1:
 with tab2:
     st.subheader("スキルツリー詳細設定")
     st.write("スキル配分などの詳細設定をここに追加します。")
+
 
 
