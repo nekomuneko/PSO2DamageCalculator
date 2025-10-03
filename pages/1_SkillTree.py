@@ -10,6 +10,14 @@ st.set_page_config(layout="wide")
 # 1. 補正データ定義 (拡張性のため、ここに静的データを集約)
 # =================================================================
 
+# --- プレイヤー基礎ステータス (固定値) ---
+# 基礎ステータス入力UIを削除したため、これらの値を定数として使用します。
+BASE_HP_CONST = 650
+BASE_PP_CONST = 120
+BASE_ATK_CONST = 540       # 打撃力、射撃力、法撃力の基礎値
+BASE_DEF_CONST = 450       # 打撃防御、射撃防御、法撃防御の基礎値
+BASE_ACCURACY_CONST = 415  # 技量の基礎値
+
 # --- 種族補正データ (乗算補正: 1.05 = +5%, 0.95 = -5%) ---
 # 最終的な計算は小数点以下を切り捨て。
 RACE_CORRECTIONS = {
@@ -63,22 +71,7 @@ if 'skills_data' not in st.session_state:
     st.session_state['skills_data'] = {}
     
 # 装備・設定のダミー値（今回はユーザ入力として移動）
-if 'gear_weapon_atk' not in st.session_state:
-    st.session_state['gear_weapon_atk'] = 2000
-if 'enemy_def' not in st.session_state:
-    st.session_state['enemy_def'] = 1000
-
-# プレイヤー基礎ステータス (初期値はユーザーの指定値)
-if 'base_hp' not in st.session_state:
-    st.session_state['base_hp'] = 650
-if 'base_pp' not in st.session_state:
-    st.session_state['base_pp'] = 120
-if 'base_atk_val' not in st.session_state:
-    st.session_state['base_atk_val'] = 540 
-if 'base_def_val' not in st.session_state:
-    st.session_state['base_def_val'] = 450 
-if 'base_accuracy_val' not in st.session_state:
-    st.session_state['base_accuracy_val'] = 415 
+# ※ 基礎ステータス入力UIは削除されたため、関連するセッションステートも削除
 
 # 種族 (Race)
 if 'race_select' not in st.session_state:
@@ -90,11 +83,11 @@ if 'mag_stats' not in st.session_state:
 
 # --- クラスブーストON/OFF ---
 if 'class_boost_enabled' not in st.session_state:
-    st.session_state['class_boost_enabled'] = True # デフォルトでONにしておく
+    st.session_state['class_boost_enabled'] = True 
 # --------------------------------------------------
 
 # -------------------------------------------------------------------
-# クラス定義 (ご要望の並び順: Hu, FI, Ra, Gu, Fo, Te, Br, Bo, Su, Hr, Ph, Et, Lu)
+# クラス定義
 # -------------------------------------------------------------------
 ALL_CLASSES = ["Hu", "Fi", "Ra", "Gu", "Fo", "Te", "Br", "Bo", "Su", "Hr", "Ph", "Et", "Lu"]
 SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
@@ -120,12 +113,12 @@ def get_calculated_stats():
     mag_stats = st.session_state['mag_stats']
     sub_class_select = st.session_state['sub_class_select']
 
-    # 計算に使う基礎値の定義
-    BASE_ATK_VAL = st.session_state['base_atk_val']
-    BASE_DEF_VAL = st.session_state['base_def_val'] 
-    BASE_ACCURACY_VAL = st.session_state['base_accuracy_val']
-    BASE_HP = st.session_state['base_hp']
-    BASE_PP = st.session_state['base_pp']
+    # 計算に使う固定基礎値の定義 (UI削除に伴い定数を使用)
+    BASE_ATK_VAL = BASE_ATK_CONST
+    BASE_DEF_VAL = BASE_DEF_CONST
+    BASE_ACCURACY_VAL = BASE_ACCURACY_CONST
+    BASE_HP = BASE_HP_CONST
+    BASE_PP = BASE_PP_CONST
         
     # クラスブーストボーナス
     CB_BONUS = CLASS_BOOST_BONUS if st.session_state['class_boost_enabled'] else {k: 0 for k in CLASS_BOOST_BONUS.keys()}
@@ -174,8 +167,6 @@ def get_calculated_stats():
         # 4. クラスブースト増加分 (全ステータス)
         total_value += CB_BONUS.get(stat_name, 0)
         
-        # 5. その他の加算ボーナスは削除されました。
-
         return total_value
 
     # --- 計算実行 ---
@@ -235,72 +226,8 @@ with col_sub_class:
 st.markdown("---")
 
 # =================================================================
-# 2. 基本ステータス設定 (基礎値 / 種族 / マグ)
+# 2. 種族 / マグ設定
 # =================================================================
-
-# --- 基礎値セクション ---
-st.subheader("プレイヤー基礎ステータス (Lv・クラス補正前)")
-col_hp, col_pp, col_base_atk = st.columns(3)
-
-with col_hp:
-    st.number_input(
-        "HP",
-        min_value=1,
-        max_value=9999,
-        key="base_hp",
-        value=st.session_state['base_hp'],
-        step=1,
-        help="キャラクターの基礎HPを入力します。"
-    )
-
-with col_pp:
-    st.number_input(
-        "PP",
-        min_value=1,
-        max_value=999,
-        key="base_pp",
-        value=st.session_state['base_pp'],
-        step=1,
-        help="キャラクターの基礎PPを入力します。"
-    )
-
-with col_base_atk:
-    st.number_input(
-        "攻撃力基礎値 (打/射/法)",
-        min_value=0,
-        max_value=9999,
-        key="base_atk_val",
-        value=st.session_state['base_atk_val'],
-        step=1,
-        help="打撃力、射撃力、法撃力の基礎値。"
-    )
-    
-col_base_def, col_base_acc, col_empty = st.columns(3) # 防御と技量の入力欄を追加
-
-with col_base_def:
-    st.number_input(
-        "防御力基礎値 (打防/射防/法防)",
-        min_value=0,
-        max_value=9999,
-        key="base_def_val",
-        value=st.session_state['base_def_val'],
-        step=1,
-        help="打撃防御、射撃防御、法撃防御の基礎値。"
-    )
-
-with col_base_acc:
-    st.number_input(
-        "技量基礎値",
-        min_value=0,
-        max_value=9999,
-        key="base_accuracy_val",
-        value=st.session_state['base_accuracy_val'],
-        step=1,
-        help="技量の基礎値。"
-    )
-
-
-st.markdown("---")
 
 # --- 種族セクション ---
 st.subheader("種族設定")
@@ -335,8 +262,7 @@ elif current_total_mag == MAG_MAX_TOTAL:
     st.success("マグの合計値が上限に達しました。", icon="✅")
 
 # マグの数値入力 (2列で配置: 攻撃/防御, 技量)
-# 技量を単独で配置するため、3列目を確保し、技量以外を2列で管理する
-mag_cols = st.columns([1, 1, 1]) # 攻撃系、防御系、技量
+mag_cols = st.columns([1, 1, 1]) 
 
 # 入力欄の生成
 # 打撃力, 射撃力, 法撃力
@@ -384,7 +310,7 @@ with mag_cols[2]:
 st.markdown("---")
 
 # --- クラスブースト設定 ---
-st.subheader("加算ボーナス設定")
+st.subheader("クラスブースト設定")
 
 # クラスブーストチェックボックス
 st.checkbox(
@@ -394,11 +320,10 @@ st.checkbox(
     help="チェックを入れると、HP+60, PP+10, 攻撃力+120, 技量+60, 防御力+90が加算されます。"
 )
 
-# その他の加算ボーナスのUIは削除しました。
 st.markdown("---")
 
 # =================================================================
-# 3. 合計基礎ステータス表示 (計算結果表示)
+# 3. 合計基本ステータス表示 (計算結果表示)
 # =================================================================
 
 # 補正込みの合計値を計算
@@ -406,7 +331,8 @@ total_stats = get_calculated_stats()
 
 st.subheader("合計基本ステータス (計算式適用後)")
 
-st.markdown("##### (メインクラス + サブクラス(0.2倍) + クラスブースト + マグ)")
+st.markdown("##### (基礎値 + 種族補正 + クラス補正 + クラスブースト + マグ)")
+st.caption(f"※ 基礎値: HP:{BASE_HP_CONST}, PP:{BASE_PP_CONST}, 攻撃力:{BASE_ATK_CONST}, 防御力:{BASE_DEF_CONST}, 技量:{BASE_ACCURACY_CONST}")
 
 col_atk, col_def = st.columns(2)
 
@@ -455,12 +381,7 @@ export_data = {
     "sub_class": st.session_state['sub_class_select'],
     "skills": st.session_state['skills_data'], 
     
-    # 新規追加のデータ (拡張性に対応)
-    "base_hp": st.session_state['base_hp'],
-    "base_pp": st.session_state['base_pp'],
-    "base_atk_val": st.session_state['base_atk_val'],
-    "base_def_val": st.session_state['base_def_val'],
-    "base_accuracy_val": st.session_state['base_accuracy_val'],
+    # 基礎値は固定になったため、エクスポート対象から削除しました。
 
     "race": st.session_state['race_select'],
     "mag_stats": st.session_state['mag_stats'], 
@@ -468,9 +389,7 @@ export_data = {
     # クラスブースト設定値
     "class_boost_enabled": st.session_state['class_boost_enabled'],
     
-    # 削除された加算ボーナスは含めません
-    
-    "version": "pso2_dmg_calc_v4"
+    "version": "pso2_dmg_calc_v5_fixed_base_stats"
 }
 
 export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
@@ -498,17 +417,7 @@ if uploaded_file is not None:
             st.session_state['sub_class_select'] = data["sub_class"]
             st.session_state['skills_data'] = data["skills"]
             
-            # 基礎ステータスのインポート
-            if "base_hp" in data:
-                st.session_state['base_hp'] = data["base_hp"]
-            if "base_pp" in data:
-                st.session_state['base_pp'] = data["base_pp"]
-            if "base_atk_val" in data:
-                st.session_state['base_atk_val'] = data["base_atk_val"]
-            if "base_def_val" in data: 
-                st.session_state['base_def_val'] = data["base_def_val"]
-            if "base_accuracy_val" in data: 
-                st.session_state['base_accuracy_val'] = data["base_accuracy_val"]
+            # 基礎ステータス値のインポートは削除されました。
 
             if "race" in data:
                 st.session_state['race_select'] = data["race"]
@@ -523,8 +432,6 @@ if uploaded_file is not None:
             if "class_boost_enabled" in data:
                 st.session_state['class_boost_enabled'] = data["class_boost_enabled"]
 
-            # 削除された加算ボーナスはインポートしない
-                
             st.success(f"設定をインポートしました。")
             st.rerun() 
         else:
