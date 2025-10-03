@@ -122,9 +122,9 @@ ALL_SKILL_DATA = {
 MAG_STATS_FIELDS = ["打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
 STATS_FIELDS = ["HP", "PP", "打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
 ALL_CLASSES = list(WIKI_BASE_STATS.keys())
-# Hrはサブクラスに設定できない (ゲーム仕様に基づき修正)
+# Hrはサブクラスに設定できない
 UNAVAILABLE_SUBCLASSES = ["Hr"] 
-# 後継クラスがメインクラスの場合、サブクラスはNoneに固定される (ゲーム仕様)
+# 後継クラスがメインクラスの場合、サブクラスはNoneに固定される
 SUCCESSOR_MAIN_CLASSES = ["Hr", "Ph", "Et", "Lu"] 
 
 # ユーザー要望によりSPは114で固定
@@ -141,7 +141,7 @@ def custom_round_half_up(num):
 
 # --- セッションステートの初期化 ---
 if 'main_class_select' not in st.session_state: st.session_state['main_class_select'] = "Gu" 
-if 'sub_class_select' not in st.session_state: st.session_state['sub_class_select'] = "Ph" # デフォルトをPhに変更
+if 'sub_class_select' not in st.session_state: st.session_state['sub_class_select'] = "Ph" 
 if 'race_select' not in st.session_state: st.session_state['race_select'] = "キャスト女" 
 if 'mag_stats' not in st.session_state: 
     st.session_state['mag_stats'] = {field: 200 if field == "射撃力" else 0 for field in MAG_STATS_FIELDS}
@@ -471,25 +471,27 @@ sub_sp_remaining = FIXED_SP_PER_CLASS - sub_sp_spent if sub_class_name_key != 'N
 
 col_main_sp, col_sub_sp = st.columns(2)
 
+# --- メインクラスSPの表示修正 ---
 with col_main_sp:
     st.markdown(f"#### メインクラス SP (合計: {FIXED_SP_PER_CLASS})")
     st.metric(
-        label=f"**{main_class}** 使用済み / 残り SP",
-        value=f"{main_sp_spent} / {main_sp_remaining}",
-        delta=f"残り {main_sp_remaining}" if main_sp_remaining >= 0 else f"超過 {abs(main_sp_remaining)}",
+        label=f"**{main_class}** SP 使用状況", # ラベル修正
+        value=f"{main_sp_spent} / {FIXED_SP_PER_CLASS}", # 表示形式を「使用済み / 合計」に修正
+        delta=f"残 {main_sp_remaining} SP" if main_sp_remaining >= 0 else f"超過 {abs(main_sp_remaining)} SP", # 残りSPをdeltaで補足
         delta_color="inverse" if main_sp_remaining >= 0 else "normal"
     )
     if main_sp_remaining < 0:
         st.error(f"メインSPが {abs(main_sp_remaining)} ポイント超過しています！")
 
 
+# --- サブクラスSPの表示修正 ---
 with col_sub_sp:
     if sub_class_name_key != 'None':
         st.markdown(f"#### サブクラス SP (合計: {FIXED_SP_PER_CLASS})")
         st.metric(
-            label=f"**{sub_class_name_key}** 使用済み / 残り SP",
-            value=f"{sub_sp_spent} / {sub_sp_remaining}",
-            delta=f"残り {sub_sp_remaining}" if sub_sp_remaining >= 0 else f"超過 {abs(sub_sp_remaining)}",
+            label=f"**{sub_class_name_key}** SP 使用状況", # ラベル修正
+            value=f"{sub_sp_spent} / {FIXED_SP_PER_CLASS}", # 表示形式を「使用済み / 合計」に修正
+            delta=f"残 {sub_sp_remaining} SP" if sub_sp_remaining >= 0 else f"超過 {abs(sub_sp_remaining)} SP", # 残りSPをdeltaで補足
             delta_color="inverse" if sub_sp_remaining >= 0 else "normal"
         )
         if sub_sp_remaining < 0:
@@ -501,6 +503,7 @@ with col_sub_sp:
 st.markdown("---")
 
 # --- タブ表示 (タブ名に残SPを表示) ---
+# タブ名は残SPを表示し、使用状況を一目でわかるように維持します。
 
 main_tab_title = f"メイン: {main_class} (残 {main_sp_remaining})"
 sub_tab_title = f"サブ: {sub_class_name_key} (残 {sub_sp_remaining})" if current_sub_class != 'None' else "サブクラス (None)"
