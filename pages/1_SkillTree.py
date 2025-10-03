@@ -2,7 +2,8 @@
 
 import streamlit as st
 import json
-from pathlib import Path 
+# pathlibは現在使用されていないため削除しました
+# from pathlib import Path 
 
 st.set_page_config(layout="wide")
 
@@ -19,33 +20,12 @@ if 'enemy_def' not in st.session_state:
     st.session_state['enemy_def'] = 1000
 # --------------------------------------------------
 
-# --- GitHub Raw URL ベースパス (フォルダ名を「image」単数形に修正済) ---
-# Raw URL形式: https://raw.githubusercontent.com/<ユーザー名>/<リポジトリ名>/<ブランチ名>/image/
-GITHUB_RAW_BASE_URL = "https://raw.githubusercontent.com/nekomuneko/PSO2DamageCalculator/main/image/"
-# -----------------------------------------------------------------
-
 # -------------------------------------------------------------------
-# クラス名とファイル名のみの対応付け
+# クラス定義 (画像関連のコードはすべて削除されました)
 # -------------------------------------------------------------------
-CLASS_IMAGES = {
-    "Bo": "Bo.png", "Br": "Br.png", "Et": "Et.png",
-    "Fi": "Fi.png", "Fo": "Fo.png", "Gu": "Gu.png",
-    "Hr": "Hr.png", "Hu": "Hu.png", "Lu": "Lu.png",
-    "Ph": "Ph.png", "Ra": "Ra.png", "Su": "Su.png",
-    "Te": "Te.png"
-}
-# -------------------------------------------------------------------
-
-# --- URLを返すヘルパー関数 ---
-def get_image_url(filename: str):
-    """画像ファイルを直接GitHubのRaw URLとして返す"""
-    if not filename:
-        return None
-    return f"{GITHUB_RAW_BASE_URL}{filename}"
-
-# 全てのクラス定義
-ALL_CLASSES = list(CLASS_IMAGES.keys())
+ALL_CLASSES = ["Bo", "Br", "Et", "Fi", "Fo", "Gu", "Hr", "Hu", "Lu", "Ph", "Ra", "Su", "Te"]
 SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
+# -------------------------------------------------------------------
 
 st.title("📚 1. Skill Tree 設定")
 
@@ -55,73 +35,35 @@ tab1, tab2 = st.tabs(["myset", "skill tree"])
 with tab1:
     st.subheader("クラス構成とデータ管理 (myset)")
     
-    # --- クラス選択エリア ---
+    # --- クラス選択エリア (画像表示なしのシンプルな形) ---
     
-    col_main_img, col_main_select = st.columns([1, 4])
-    
-    with col_main_img:
-        selected_main_class = st.session_state['main_class_select']
-        image_filename = CLASS_IMAGES.get(selected_main_class)
-        
-        # URLを取得
-        image_to_display = get_image_url(image_filename)
-            
-        # URLがある場合のみ表示
-        if image_to_display is not None:
-            st.image(image_to_display, width=256) 
-        
-    with col_main_select:
-        main_class = st.selectbox(
-            "メインクラス",
-            options=ALL_CLASSES,
-            key="main_class_select",
-            label_visibility="collapsed"
-        )
+    main_class = st.selectbox(
+        "メインクラス",
+        options=ALL_CLASSES,
+        key="main_class_select",
+    )
     
     # --- サブクラスのオプションロジック ---
     
     if main_class in ["Hr", "Ph", "Et", "Lu"]:
         st.info(f"{main_class}は後継クラスのため、サブクラスを設定できません。")
         
-        col_sub_img, col_sub_select = st.columns([1, 4])
-        with col_sub_img:
-            pass
-        with col_sub_select:
-            st.selectbox(
-                "サブクラス",
-                options=["None"],
-                index=0,
-                key="sub_class_select",
-                disabled=True,
-                label_visibility="collapsed"
-            )
+        st.selectbox(
+            "サブクラス",
+            options=["None"],
+            index=0,
+            key="sub_class_select",
+            disabled=True,
+        )
         st.session_state['sub_class_select'] = "None" 
     else:
         sub_class_options_filtered = ["None"] + [c for c in SUB_CLASSES_CANDIDATES if c != main_class]
 
-        col_sub_img, col_sub_select = st.columns([1, 4])
-        
-        with col_sub_img:
-            selected_sub_class = st.session_state.get('sub_class_select', 'None')
-            
-            if selected_sub_class == "None":
-                 image_to_display = None
-            else:
-                 image_filename = CLASS_IMAGES.get(selected_sub_class)
-                 # URLを取得
-                 image_to_display = get_image_url(image_filename)
-            
-            # URLがある場合のみ表示
-            if image_to_display is not None:
-                st.image(image_to_display, width=256)
-
-        with col_sub_select:
-            st.selectbox(
-                "サブクラス",
-                options=sub_class_options_filtered,
-                key="sub_class_select",
-                label_visibility="collapsed"
-            )
+        st.selectbox(
+            "サブクラス",
+            options=sub_class_options_filtered,
+            key="sub_class_select",
+        )
 
     st.markdown("---")
 
@@ -165,7 +107,3 @@ with tab1:
 with tab2:
     st.subheader("スキルツリー詳細設定")
     st.write("スキル配分などの詳細設定をここに追加します。")
-
-
-
-
