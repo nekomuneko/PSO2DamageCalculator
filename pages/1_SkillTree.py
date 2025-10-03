@@ -1,34 +1,43 @@
+承知いたしました。ご指示に従い、KeyError を防ぐためのセッションステート初期化ロジックを追加したうえで、現在の要件をすべて満たす pages/1_SkillTree.py の全コードを書き直して提示します。
+
+このコードは、画像パスのエラーを避けるための相対パスと、st.image() のフォールバックに空文字列を使わない修正も含んでいます。
+
+💻 pages/1_SkillTree.py スクリプト (最終修正版)
+Python
+
+# pages/1_SkillTree.py
+
 import streamlit as st
 import json
 import base64
-# os, pathlib のインポートは不要です。
 
 st.set_page_config(layout="wide")
+
+# --- セッションステートの初期化 (KeyError対策) ---
+if 'main_class_select' not in st.session_state:
+    st.session_state['main_class_select'] = "Hu"
+if 'sub_class_select' not in st.session_state:
+    st.session_state['sub_class_select'] = "None"
+if 'skills_data' not in st.session_state:
+    st.session_state['skills_data'] = {}
+# --------------------------------------------------
 
 # -------------------------------------------------------------------
 # クラス名と画像ファイルパスの対応付け (相対パスを使用)
 # -------------------------------------------------------------------
 CLASS_IMAGES = {
     # ファイル名と完全に一致させてください: images/Hu.png, images/Fi.png など
-    "Bo": "images/Bo.png",
-    "Br": "images/Br.png",
-    "Et": "images/Et.png",
-    "Fi": "images/Fi.png",
-    "Fo": "images/Fo.png",
-    "Gu": "images/Gu.png",
-    "Hr": "images/Hr.png",
-    "Hu": "images/Hu.png",
-    "Lu": "images/Lu.png",
-    "Ph": "images/Ph.png",
-    "Ra": "images/Ra.png",
-    "Su": "images/Su.png",
+    "Bo": "images/Bo.png", "Br": "images/Br.png", "Et": "images/Et.png",
+    "Fi": "images/Fi.png", "Fo": "images/Fo.png", "Gu": "images/Gu.png",
+    "Hr": "images/Hr.png", "Hu": "images/Hu.png", "Lu": "images/Lu.png",
+    "Ph": "images/Ph.png", "Ra": "images/Ra.png", "Su": "images/Su.png",
     "Te": "images/Te.png",
 }
-# Noneが選択された時のダミー画像 (このファイルもimagesフォルダにアップロードしてください)
+# Noneが選択された時、および画像が見つからない時のフォールバックパス
 NONE_IMAGE_PATH = "images/None.png" 
 # -------------------------------------------------------------------
 
-# 全てのクラス定義 (CLASS_IMAGESのキーから取得)
+# 全てのクラス定義
 ALL_CLASSES = list(CLASS_IMAGES.keys())
 # サブクラスとして選択可能なクラス (Hrはサブクラス設定不可のため除外)
 SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
@@ -46,13 +55,13 @@ with tab1:
     col_main_img, col_main_select = st.columns([1, 4])
     
     with col_main_img:
-        # メインクラスの画像表示
+        # メインクラスの画像表示 (フォールバックをNONE_IMAGE_PATHに設定)
         selected_main_class = st.session_state['main_class_select']
         image_to_display = CLASS_IMAGES.get(selected_main_class, NONE_IMAGE_PATH)
         st.image(image_to_display, width=64)
         
     with col_main_select:
-        # メインクラスの選択 (全クラスから選択可能)
+        # メインクラスの選択
         main_class = st.selectbox(
             "メインクラス",
             options=ALL_CLASSES,
@@ -88,11 +97,12 @@ with tab1:
         col_sub_img, col_sub_select = st.columns([1, 4])
         
         with col_sub_img:
-            # サブクラスの画像表示
+            # サブクラスの画像表示 (フォールバックをNONE_IMAGE_PATHに設定)
             selected_sub_class = st.session_state.get('sub_class_select', 'None')
             if selected_sub_class == "None":
                  image_to_display = NONE_IMAGE_PATH
             else:
+                 # ここでも、フォールバックを NONE_IMAGE_PATH に指定
                  image_to_display = CLASS_IMAGES.get(selected_sub_class, NONE_IMAGE_PATH)
             st.image(image_to_display, width=64)
 
