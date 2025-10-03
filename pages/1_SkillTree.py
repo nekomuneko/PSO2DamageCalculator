@@ -5,20 +5,25 @@ import math
 st.set_page_config(layout="wide")
 
 # =================================================================
-# 1. 補正データ定義 (確定版基礎値と補正率)
+# 1. 補正データ定義 (WIKI値と補正率)
 # =================================================================
 
-# --- プレイヤー基礎ステータス (LV100固定値として設定) ---
-NEW_BASE_STATS = {
-    "HP": 650,
-    "PP": 120,
-    "打撃力": 540,
-    "射撃力": 540,
-    "法撃力": 540,
-    "技量": 415,
-    "打撃防御": 450,
-    "射撃防御": 450,
-    "法撃防御": 450
+# --- WIKIから提供されたLv100メインクラス補正済み基礎値 ---
+# この値は、クラス補正は適用済みだが、種族補正は未適用という前提で利用します。
+WIKI_MAIN_STATS = {
+    "Hu": {"HP": 764, "PP": 120, "打撃力": 580, "射撃力": 540, "法撃力": 451, "技量": 415, "打撃防御": 580, "射撃防御": 451, "法撃防御": 451},
+    "Fi": {"HP": 655, "PP": 120, "打撃力": 580, "射撃力": 450, "法撃力": 540, "技量": 415, "打撃防御": 580, "射撃防御": 450, "法撃防御": 450},
+    "Ra": {"HP": 645, "PP": 120, "打撃力": 540, "射撃力": 580, "法撃力": 450, "技量": 415, "打撃防御": 450, "射撃防御": 580, "法撃防御": 450},
+    "Gu": {"HP": 650, "PP": 120, "打撃力": 540, "射撃力": 580, "法撃力": 450, "技量": 415, "打撃防御": 450, "射撃防御": 580, "法撃防御": 450},
+    "Fo": {"HP": 536, "PP": 120, "打撃力": 450, "射撃力": 540, "法撃力": 580, "技量": 415, "打撃防御": 450, "射撃防御": 450, "法撃防御": 580},
+    "Te": {"HP": 536, "PP": 120, "打撃力": 540, "射撃力": 450, "法撃力": 580, "技量": 415, "打撃防御": 580, "射撃防御": 450, "法撃防御": 450},
+    "Br": {"HP": 655, "PP": 120, "打撃力": 545, "射撃力": 545, "法撃力": 486, "技量": 420, "打撃防御": 488, "射撃防御": 488, "法撃防御": 488},
+    "Bo": {"HP": 655, "PP": 120, "打撃力": 545, "射撃力": 486, "法撃力": 545, "技量": 420, "打撃防御": 488, "射撃防御": 488, "法撃防御": 488},
+    "Su": {"HP": 645, "PP": 120, "打撃力": 545, "射撃力": 545, "法撃力": 545, "技量": 420, "打撃防御": 488, "射撃防御": 488, "法撃防御": 488},
+    "Hr": {"HP": 804, "PP": 120, "打撃力": 698, "射撃力": 698, "法撃力": 698, "技量": 549, "打撃防御": 697, "射撃防御": 697, "法撃防御": 697},
+    "Ph": {"HP": 780, "PP": 120, "打撃力": 711, "射撃力": 711, "法撃力": 711, "技量": 564, "打撃防御": 659, "射撃防御": 659, "法撃防御": 659},
+    "Et": {"HP": 819, "PP": 120, "打撃力": 677, "射撃力": 677, "法撃力": 677, "技量": 543, "打撃防御": 730, "射撃防御": 730, "法撃防御": 730},
+    "Lu": {"HP": 795, "PP": 120, "打撃力": 684, "射撃力": 684, "法撃力": 684, "技量": 576, "打撃防御": 710, "射撃防御": 710, "法撃防御": 710},
 }
 
 # --- 種族補正データ (乗算補正: 1.05 = +5%, 0.95 = -5%) ---
@@ -33,25 +38,6 @@ RACE_CORRECTIONS = {
     "デューマン女": {"HP": 0.95, "PP": 1.00, "打撃力": 1.06, "射撃力": 1.05, "法撃力": 1.05, "技量": 1.06, "打撃防御": 1.00, "射撃防御": 1.00, "法撃防御": 1.00},
 }
 
-# --- クラス補正データ (乗算補正) ---
-CLASS_CORRECTIONS = {
-    # 旧クラス
-    "Hu": {"HP": 1.18, "PP": 1.00, "打撃力": 1.07, "射撃力": 1.00, "法撃力": 0.83, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, 
-    "Fi": {"HP": 1.01, "PP": 1.00, "打撃力": 1.07, "射撃力": 0.83, "法撃力": 1.00, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, 
-    "Ra": {"HP": 0.99, "PP": 1.00, "打撃力": 1.00, "射撃力": 1.07, "法撃力": 0.83, "技量": 1.00, "打撃防御": 1.00, "射撃防御": 1.29, "法撃防御": 1.00}, 
-    "Gu": {"HP": 1.00, "PP": 1.00, "打撃力": 1.00, "射撃力": 1.07, "法撃力": 0.83, "技量": 1.00, "打撃防御": 1.00, "射撃防御": 1.29, "法撃防御": 1.00}, 
-    "Fo": {"HP": 0.82, "PP": 1.00, "打撃力": 0.83, "射撃力": 1.00, "法撃力": 1.07, "技量": 1.00, "打撃防御": 1.00, "射撃防御": 1.00, "法撃防御": 1.29}, 
-    "Te": {"HP": 0.82, "PP": 1.00, "打撃力": 1.00, "射撃力": 0.83, "法撃力": 1.07, "技量": 1.00, "打撃防御": 1.29, "射撃防御": 1.00, "法撃防御": 1.00}, 
-    "Br": {"HP": 1.01, "PP": 1.00, "打撃力": 1.01, "射撃力": 1.01, "法撃力": 0.90, "技量": 1.01, "打撃防御": 1.08, "射撃防御": 1.08, "法撃防御": 1.08}, 
-    "Bo": {"HP": 1.01, "PP": 1.00, "打撃力": 1.01, "射撃力": 0.90, "法撃力": 1.01, "技量": 1.01, "打撃防御": 1.08, "射撃防御": 1.08, "法撃防御": 1.08}, 
-    "Su": {"HP": 0.99, "PP": 1.00, "打撃力": 1.01, "射撃力": 1.01, "法撃力": 1.01, "技量": 1.01, "打撃防御": 1.08, "射撃防御": 1.08, "法撃防御": 1.08}, 
-    # 後継クラス
-    "Hr": {"HP": 1.24, "PP": 1.00, "打撃力": 1.29, "射撃力": 1.29, "法撃力": 1.29, "技量": 1.32, "打撃防御": 1.55, "射撃防御": 1.55, "法撃防御": 1.55}, 
-    "Ph": {"HP": 1.20, "PP": 1.00, "打撃力": 1.32, "射撃力": 1.32, "法撃力": 1.32, "技量": 1.36, "打撃防御": 1.46, "射撃防御": 1.46, "法撃防御": 1.46}, 
-    "Et": {"HP": 1.26, "PP": 1.00, "打撃力": 1.25, "射撃力": 1.25, "法撃力": 1.25, "技量": 1.31, "打撃防御": 1.62, "射撃防御": 1.62, "法撃防御": 1.62}, 
-    "Lu": {"HP": 1.22, "PP": 1.00, "打撃力": 1.27, "射撃力": 1.27, "法撃力": 1.27, "技量": 1.39, "打撃防御": 1.58, "射撃防御": 1.58, "法撃防御": 1.58}, 
-}
-
 # --- クラスブーストの固定値 (全クラスLv75達成時のボーナス) ---
 CLASS_BOOST_BONUS = {
     "HP": 60, "PP": 10, "打撃力": 120, "射撃力": 120, "法撃力": 120, "技量": 60, "打撃防御": 90, "射撃防御": 90, "法撃防御": 90
@@ -60,69 +46,60 @@ CLASS_BOOST_BONUS = {
 
 # マグのステータス定義
 MAG_STATS_FIELDS = ["打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
-ALL_CLASSES = ["Hu", "Fi", "Ra", "Gu", "Fo", "Te", "Br", "Bo", "Su", "Hr", "Ph", "Et", "Lu"]
-
-# 【重要】サブクラスとして選択できないクラス (Hrのみ)
+STATS_FIELDS = ["HP", "PP", "打撃力", "射撃力", "法撃力", "技量", "打撃防御", "射撃防御", "法撃防御"]
+ALL_CLASSES = list(WIKI_MAIN_STATS.keys())
 UNAVAILABLE_SUBCLASSES = ["Hr"]
-# 【重要】メインクラスに設定した場合、サブクラスが強制的にNoneになるクラス
 SUCCESSOR_MAIN_CLASSES = ["Hr", "Ph", "Et", "Lu"]
 
 # --- セッションステートの初期化 ---
-if 'main_class_select' not in st.session_state: st.session_state['main_class_select'] = "Hu" 
-if 'sub_class_select' not in st.session_state: st.session_state['sub_class_select'] = "None"
-if 'skills_data' not in st.session_state: st.session_state['skills_data'] = {}
-if 'race_select' not in st.session_state: st.session_state['race_select'] = "ヒューマン男"
+# 前回の設定値を保持
+if 'main_class_select' not in st.session_state: st.session_state['main_class_select'] = "Gu" 
+if 'sub_class_select' not in st.session_state: st.session_state['sub_class_select'] = "Lu" 
+if 'race_select' not in st.session_state: st.session_state['race_select'] = "キャスト女" 
 if 'mag_stats' not in st.session_state: 
-    st.session_state['mag_stats'] = {field: 0 for field in MAG_STATS_FIELDS}
+    st.session_state['mag_stats'] = {field: 200 if field == "射撃力" else 0 for field in MAG_STATS_FIELDS}
 if 'class_boost_enabled' not in st.session_state: st.session_state['class_boost_enabled'] = True 
-# ※ 'custom_skill_additions' のセッションステートは削除済み
 
 # =================================================================
-# 2. 計算関数 (確定ロジック: 全ステップ切り捨て適用)
+# 2. 計算関数 (WIKI値起点 + 全ステップ切り捨て適用)
 # =================================================================
 
 def get_calculated_stats():
     """
-    LV100基礎ステータスを起点に、種族、クラス、マグ、クラスブーストを合算した基本ステータスを計算します。
-    【確定ロジック】すべての乗算補正ステップで「切り捨て (INT / FLOOR)」を適用します。
+    WIKIのクラス補正済み基礎値に、種族補正、マグ、サブクラス貢献度、クラスブーストを合算した基本ステータスを計算します。
     
     ロジックの順序:
-    1. メインクラス最終値 = Floor(Floor(基礎値 * メインクラス補正) * 種族補正)
-    2. サブクラス貢献度 = Floor(Floor(Floor(基礎値 * サブクラス補正) * 種族補正) * 0.2)
+    1. メインクラス最終値 = Floor(WIKI_MAIN_STATS[メインクラス] * 種族補正)
+    2. サブクラス貢献度 = Floor(Floor(WIKI_MAIN_STATS[サブクラス] * 種族補正) * 0.2)
     3. 合計 = メインクラス最終値 + マグ + サブクラス貢献度 + クラスブースト
     """
     
-    # 選択されている設定の取得
     race = st.session_state['race_select']
     main_class = st.session_state['main_class_select']
-    
-    # 補正値/ボーナスを取得
-    race_cor = RACE_CORRECTIONS.get(race, {})
-    main_class_cor = CLASS_CORRECTIONS.get(main_class, {})
-    mag_stats = st.session_state['mag_stats']
     sub_class_select = st.session_state['sub_class_select']
+    
+    race_cor = RACE_CORRECTIONS.get(race, {})
+    mag_stats = st.session_state['mag_stats']
     
     # クラスブーストボーナス
     CB_BONUS = CLASS_BOOST_BONUS if st.session_state['class_boost_enabled'] else {k: 0 for k in CLASS_BOOST_BONUS.keys()}
-    
+        
     calculated_stats = {}
 
-    for stat_name, base_val in NEW_BASE_STATS.items():
-        # --- 1. メインクラスによるステータス計算 (HP/PP含む) ---
+    for stat_name in STATS_FIELDS:
+        # WIKIからクラス補正済み基礎値を取得
+        wiki_main_base_val = WIKI_MAIN_STATS.get(main_class, {}).get(stat_name, 0)
         
-        # 1-1. メインクラス補正適用 (切り捨て)
-        main_class_multiplier = main_class_cor.get(stat_name, 1.0)
-        main_after_class = int(base_val * main_class_multiplier)
-
-        # 1-2. 種族補正適用 (切り捨て)
+        # --- 1. メインクラスによるステータス計算 ---
+        
+        # 1-1. 種族補正適用 (切り捨て)
         race_multiplier = race_cor.get(stat_name, 1.0)
-        main_final_value = int(main_after_class * race_multiplier)
+        main_final_value = int(wiki_main_base_val * race_multiplier)
         
         total_value = main_final_value
 
         # --- 2. サブクラス貢献度 & マグ (ATK/DEF/ACC/技量のみ) ---
         
-        # HP/PPにはサブクラス、マグの寄与は無い
         if stat_name not in ['HP', 'PP']:
             
             # マグボーナス加算
@@ -132,30 +109,24 @@ def get_calculated_stats():
             sub_contribution = 0
             
             # サブクラスが設定されており、かつメインクラスが後継クラスではない場合
-            if sub_class_select != 'None':
-                sub_cor = CLASS_CORRECTIONS.get(sub_class_select, {})
-                sub_class_multiplier = sub_cor.get(stat_name, 1.0)
-
-                # 2-1. サブクラス補正適用 (切り捨て)
-                # 基礎値から計算を始める
-                sub_after_class = int(base_val * sub_class_multiplier)
-
-                # 2-2. 種族補正適用 (切り捨て)
-                sub_after_race = int(sub_after_class * race_multiplier)
+            if sub_class_select != 'None' and main_class not in SUCCESSOR_MAIN_CLASSES:
                 
-                # 2-3. サブクラス貢献度 20% 適用 (切り捨て)
-                # 確定ロジック: 最終補正の0.2倍にも切り捨てを適用する
+                # サブクラスのWIKI値を取得
+                wiki_sub_base_val = WIKI_MAIN_STATS.get(sub_class_select, {}).get(stat_name, 0)
+
+                # 2-1. 種族補正適用 (切り捨て) - WIKI値から計算を始める
+                sub_after_race = int(wiki_sub_base_val * race_multiplier)
+                
+                # 2-2. サブクラス貢献度 20% 適用 (切り捨て)
                 sub_contribution = int(sub_after_race * 0.2)
                 
                 total_value += sub_contribution
 
-        # --- 3. クラスブースト/その他固定値加算 ---
+        # --- 3. クラスブースト加算 ---
         
         # クラスブースト増加分 (全ステータス共通)
         total_value += CB_BONUS.get(stat_name, 0)
-        
-        # ※ ここにスキル固定値加算のロジックは意図的に削除されています。
-        
+                
         calculated_stats[stat_name] = total_value
         
     return calculated_stats
@@ -164,7 +135,8 @@ def get_calculated_stats():
 # Streamlit UI
 # =================================================================
 
-st.title("📚 1. クラス・マグ 設定")
+st.title("📚 1. ステータス計算機 (WIKI基礎値採用版)")
+st.caption("※ 計算ロジックを、お客様から提供されたWIKIのメインクラス基礎値表を起点に修正しました。")
 
 # =================================================================
 # 1. クラス構成 (クラス / サブクラス)
@@ -191,17 +163,15 @@ with col_sub_class:
             key="sub_class_select",
             disabled=True,
         )
-        # 状態を強制的に"None"に設定
         if st.session_state.get('sub_class_select') != "None":
             st.session_state['sub_class_select'] = "None" 
 
         st.info(f"{main_class}は後継クラスのため、サブクラスはNone固定です。", icon="ℹ️")
     else:
         # メインクラスが旧クラスの場合
-        # サブクラスの選択肢からメインクラス自身と【Hrのみ】を除外する
         sub_class_options_filtered = ["None"] + [
             c for c in ALL_CLASSES 
-            if c != main_class and c not in UNAVAILABLE_SUBCLASSES # Hrは選択肢から除外
+            if c != main_class and c not in UNAVAILABLE_SUBCLASSES 
         ]
 
         st.selectbox(
@@ -209,8 +179,6 @@ with col_sub_class:
             options=sub_class_options_filtered,
             key="sub_class_select",
         )
-        
-        # 選択されたサブクラスがHrだった場合（過去のセッションステート等で残っていた場合）
         if st.session_state.get('sub_class_select') == "Hr":
             st.warning("Hrはサブクラスに設定できません。Noneに戻します。")
             st.session_state['sub_class_select'] = "None"
@@ -223,15 +191,9 @@ st.markdown("---")
 # 2. 種族設定
 # =================================================================
 
-# --- 種族セクション ---
 st.subheader("種族設定")
 
-RACE_OPTIONS = [
-    "ヒューマン男", "ヒューマン女",
-    "ニューマン男", "ニューマン女",
-    "キャスト男", "キャスト女",
-    "デューマン男", "デューマン女"
-]
+RACE_OPTIONS = list(RACE_CORRECTIONS.keys())
 st.selectbox(
     "種族",
     options=RACE_OPTIONS,
@@ -248,11 +210,9 @@ st.subheader("マグ/クラスブースト設定")
 
 # --- マグの入力 ---
 st.markdown("##### マグのステータス")
-# 合計値の計算とチェック
+# マグの合計値を最初に表示
 current_total_mag = sum(st.session_state['mag_stats'].values())
 MAG_MAX_TOTAL = 200
-
-# --- マグの合計値を最初に表示 ---
 st.markdown(f"**合計値:** **`{current_total_mag} / {MAG_MAX_TOTAL}`**")
 
 if current_total_mag > MAG_MAX_TOTAL:
@@ -269,10 +229,12 @@ mag_fields = [
     ["技量"]
 ]
 
+def update_mag_stats(field):
+    st.session_state['mag_stats'][field] = st.session_state[f"mag_input_{field}"]
+
 for col_idx, fields in enumerate(mag_fields):
     with mag_cols[col_idx]:
         for field in fields:
-            # st.number_inputのキーとセッションステートの更新ロジックを修正 (一括更新)
             st.number_input(
                 field,
                 min_value=0,
@@ -281,7 +243,8 @@ for col_idx, fields in enumerate(mag_fields):
                 value=st.session_state['mag_stats'].get(field, 0),
                 step=1,
                 label_visibility="visible",
-                on_change=lambda f=field: st.session_state['mag_stats'].__setitem__(f, st.session_state[f"mag_input_{f}"])
+                on_change=update_mag_stats,
+                args=(field,)
             )
 
 # --- クラスブースト設定 ---
@@ -304,7 +267,7 @@ total_stats = get_calculated_stats()
 
 st.subheader("合計基本ステータス (最終理論値)")
 
-st.markdown(f"##### (Lv100基礎値 + 種族/クラス補正 + マグ + クラスブースト)")
+st.markdown(f"##### (WIKIクラス値 + 種族補正 + マグ + サブ貢献度 + クラスブースト)")
 st.caption(f"※ 計算は**全ステップで厳密に切り捨て ($\text{{INT}}$) を適用**しています。")
 
 # ステータス表示を整頓
@@ -327,95 +290,3 @@ for stat1_name, stat2_name in stat_pairs:
             st.metric(label=f"{stat2_name} (Total)", value=f"{total_stats[stat2_name]}")
 
 st.markdown("---")
-
-# =================================================================
-# 5. エクスポート/インポート機能 (in / out)
-# =================================================================
-
-st.subheader("mysetno (エクスポート/インポート)")
-
-export_data = {
-    "main_class": st.session_state['main_class_select'],
-    "sub_class": st.session_state['sub_class_select'],
-    "skills": st.session_state['skills_data'], 
-    "race": st.session_state['race_select'],
-    "mag_stats": st.session_state['mag_stats'], 
-    "class_boost_enabled": st.session_state['class_boost_enabled'],
-    # ※ 'custom_skill_additions' は削除済み
-    "version": "pso2_dmg_calc_v18_reverted" # バージョン名を更新
-}
-
-export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
-
-col_export, col_import = st.columns(2)
-
-with col_export:
-    st.download_button(
-        label="⬇️ JSONファイルをエクスポート",
-        data=export_json,
-        file_name=f"pso2_set_{st.session_state['main_class_select']}_{st.session_state['sub_class_select']}.json",
-        mime="application/json",
-        use_container_width=True
-    )
-
-with col_import:
-    uploaded_file = st.file_uploader("⬆️ JSONファイルをインポート", type=["json"], key="import_uploader")
-
-if uploaded_file is not None:
-    try:
-        data = json.load(uploaded_file)
-        
-        if "main_class" in data and "sub_class" in data and "skills" in data:
-            st.session_state['main_class_select'] = data["main_class"]
-            st.session_state['sub_class_select'] = data["sub_class"]
-            st.session_state['skills_data'] = data["skills"]
-            
-            if "race" in data:
-                st.session_state['race_select'] = data["race"]
-            if "mag_stats" in data:
-                st.session_state['mag_stats'] = data["mag_stats"]
-                for field, value in data["mag_stats"].items():
-                    if f"mag_input_{field}" in st.session_state:
-                         st.session_state[f"mag_input_{field}"] = value
-                         
-            if "class_boost_enabled" in data:
-                st.session_state['class_boost_enabled'] = data["class_boost_enabled"]
-            
-            # ※ 固定値加算のインポート処理は削除済み
-
-            st.success(f"設定をインポートしました。")
-            st.rerun() 
-        else:
-            st.error("インポートされたJSONファイルが必要なキーを含んでいません。")
-    except json.JSONDecodeError:
-        st.error("ファイルが有効なJSON形式ではありません。")
-    except Exception as e:
-        st.error(f"ファイルの処理中にエラーが発生しました: {e}")
-
-st.markdown("---")
-
-# =================================================================
-# 6. スキルツリー詳細設定
-# =================================================================
-
-st.subheader("スキルツリー詳細設定 (未実装)")
-
-main_class_name = st.session_state.get('main_class_select', 'Hu')
-sub_class_name = st.session_state.get('sub_class_select', 'None')
-
-# タブのリストを Main / Sub の順で作成
-skill_tabs_list = [main_class_name]
-if sub_class_name != 'None':
-    skill_tabs_list.append(sub_class_name)
-
-if skill_tabs_list:
-    skill_tab_objects = st.tabs(skill_tabs_list)
-
-    for i, class_name in enumerate(skill_tabs_list):
-        with skill_tab_objects[i]:
-            st.header(f"{class_name} スキル設定")
-            
-            st.write(f"現在、**{class_name}** のスキルツリー設定を表示しています。")
-            st.info("ここにスキル名とレベル入力のUIが入り、その効果がダメージ計算に反映されます。")
-else:
-    st.warning("クラスが選択されていません。")
