@@ -64,15 +64,12 @@ MAG_STATS_FIELDS = ["打撃力", "射撃力", "法撃力", "技量", "打撃防�
 
 # --- セッションステートの初期化 ---
 if 'main_class_select' not in st.session_state:
-    st.session_state['main_class_select'] = "Hu"
+    st.session_state['main_class_select'] = "Br" # ユーザーの設定に合わせてデフォルトを変更
 if 'sub_class_select' not in st.session_state:
     st.session_state['sub_class_select'] = "None"
 if 'skills_data' not in st.session_state:
     st.session_state['skills_data'] = {}
     
-# 装備・設定のダミー値（今回はユーザ入力として移動）
-# ※ 基礎ステータス入力UIは削除されたため、関連するセッションステートも削除
-
 # 種族 (Race)
 if 'race_select' not in st.session_state:
     st.session_state['race_select'] = "ヒューマン男"
@@ -80,6 +77,17 @@ if 'race_select' not in st.session_state:
 # マグ (Mag Stats)
 if 'mag_stats' not in st.session_state:
     st.session_state['mag_stats'] = {field: 0 for field in MAG_STATS_FIELDS}
+
+# --- スキルツリー固定値ボーナス ---
+# ※ 計算には反映しないが、入力UIには表示できるように維持
+if 'st_fixed_bonus' not in st.session_state:
+    st.session_state['st_fixed_bonus'] = {
+        "HP": 50, 
+        "PP": 10, 
+        "打撃力": 50, "射撃力": 160, "法撃力": 50, 
+        "技量": 50,
+        "打撃防御": 50, "射撃防御": 50, "法撃防御": 50, 
+    }
 
 # --- クラスブーストON/OFF ---
 if 'class_boost_enabled' not in st.session_state:
@@ -100,7 +108,11 @@ SUB_CLASSES_CANDIDATES = [c for c in ALL_CLASSES if c != "Hr"]
 def get_calculated_stats():
     """
     ユーザー入力、種族補正、クラス補正、マグ補正、クラスブーストを合算した基本ステータスを計算します。
-    計算式: INT(基礎値 * 種族補正 * メイン補正) + INT(サブクラス値 * 0.2) + クラスブースト + マグ
+    【重要】乗算補正の適用ごとに小数点以下を切り捨てることで、ズレを修正します。
+    
+    計算式: 
+    [ATK/DEF/ACC]: INT(INT(基礎値 * 種族補正) * メイン補正) + INT(サブクラス値 * 0.2) + マグ + クラスブースト
+    [HP/PP]: INT(INT(基礎値 * 種族補正) * メイン補正) + クラスブースト (HP/PPにはサブクラス・マグボーナス無し)
     """
     
     # 選択されている設定の取得
@@ -143,29 +155,37 @@ def get_calculated_stats():
         race_multiplier = race_cor.get(stat_name, 1.0)
         main_class_multiplier = class_cor.get(stat_name, 1.0)
         
-        # 1. メインクラス貢献分: INT(基礎値 * 種族補正 * メインクラス補正)
-        main_contribution = int(base_val * race_multiplier * main_class_multiplier)
+        # 1. 種族補正適用 (INT(基礎値 * 種族補正))
+        # ここでまず切り捨てを適用
+        base_after_race = int(base_val * race_multiplier)
+
+        # 2. メインクラス貢献分: INT(↑ * メインクラス補正)
+        main_contribution = int(base_after_race * main_class_multiplier)
         total_value = main_contribution
 
-        # 2. サブクラス貢献分 (ATK/DEF/ACCのみ、Hr/Ph/Et/Luはサブクラス設定不可)
+        # 3. サブクラス貢献分 (ATK/DEF/ACC/技量のみ、Hr/Ph/Et/Luはサブクラス設定不可)
         if base_stat_type in ['atk', 'def', 'acc'] and sub_class_select != 'None':
             sub_cor = CLASS_CORRECTIONS.get(sub_class_select, {})
             sub_class_multiplier = sub_cor.get(stat_name, 1.0)
 
-            # サブクラス値: INT(基礎値 * 種族補正 * サブクラス補正)
-            sub_class_stat_value = int(base_val * race_multiplier * sub_class_multiplier)
+            # サブクラス値: INT(INT(基礎値 * 種族補正) * サブクラス補正)
+            # ここでも種族補正適用後に切り捨てた値を使用
+            sub_class_stat_value_before_mult = int(base_after_race * sub_class_multiplier)
             
             # サブクラス貢献分: INT(サブクラス値 * 0.2)
-            sub_contribution = int(sub_class_stat_value * 0.2)
+            sub_contribution = int(sub_class_stat_value_before_mult * 0.2)
             total_value += sub_contribution
             
-        # 3. マグ増加分 (ATK/DEF/ACC/技量のみ)
-        if stat_name in mag_stats: # 攻撃力、防御力、技量にマグボーナスを適用
+        # 4. マグ増加分 (ATK/DEF/ACC/技量のみ)
+        if stat_name in mag_stats: 
             mag_bonus = mag_stats.get(stat_name, 0)
             total_value += mag_bonus
 
-        # 4. クラスブースト増加分 (全ステータス)
+        # 5. クラスブースト増加分 (全ステータス)
         total_value += CB_BONUS.get(stat_name, 0)
+        
+        # 6. スキルツリー固定値ボーナス増加分 (計算には含めないよう、この行は削除/コメントアウト)
+        # total_value += st_fixed_bonus.get(stat_name, 0) 
         
         return total_value
 
@@ -370,7 +390,78 @@ with col_pp:
 st.markdown("---")
 
 # =================================================================
-# 4. エクスポート/インポート機能 (in / out)
+# 4. スキルツリー固定値ボーナス設定 (計算には未反映)
+# =================================================================
+st.subheader("スキルツリー固定値ボーナス (調整用)")
+st.caption("※ **現在、このセクションで入力された数値は、合計基本ステータスには加算されていません。** ズレを確認するための一時的な入力欄です。")
+
+st_bonus_cols = st.columns(4)
+
+# 入力値の更新関数
+def update_st_bonus(field):
+    """スキルツリーボーナスの値をセッションステートに保存するコールバック"""
+    st.session_state['st_fixed_bonus'][field] = st.session_state[f'st_bonus_input_{field}']
+
+# HP / PP
+with st_bonus_cols[0]:
+    # HP
+    st.number_input(
+        "HP (STボーナス)",
+        min_value=0,
+        key='st_bonus_input_HP',
+        value=st.session_state['st_fixed_bonus']['HP'],
+        step=1,
+        on_change=lambda f='HP': update_st_bonus(f)
+    )
+    # PP
+    st.number_input(
+        "PP (STボーナス)",
+        min_value=0,
+        key='st_bonus_input_PP',
+        value=st.session_state['st_fixed_bonus']['PP'],
+        step=1,
+        on_change=lambda f='PP': update_st_bonus(f)
+    )
+
+# 攻撃力
+for i, field in enumerate(["打撃力", "射撃力", "法撃力"]):
+    with st_bonus_cols[1 + (i // 3)]: # 1列目 (攻撃力)
+        st.number_input(
+            f"{field} (STボーナス)",
+            min_value=0,
+            key=f'st_bonus_input_{field}',
+            value=st.session_state['st_fixed_bonus'][field],
+            step=1,
+            on_change=lambda f=field: update_st_bonus(f)
+        )
+# 技量
+with st_bonus_cols[2]:
+    field = "技量"
+    st.number_input(
+        f"{field} (STボーナス)",
+        min_value=0,
+        key=f'st_bonus_input_{field}',
+        value=st.session_state['st_fixed_bonus'][field],
+        step=1,
+        on_change=lambda f=field: update_st_bonus(f)
+    )
+
+# 防御力
+for i, field in enumerate(["打撃防御", "射撃防御", "法撃防御"]):
+    with st_bonus_cols[3]: # 4列目 (防御力)
+        st.number_input(
+            f"{field} (STボーナス)",
+            min_value=0,
+            key=f'st_bonus_input_{field}',
+            value=st.session_state['st_fixed_bonus'][field],
+            step=1,
+            on_change=lambda f=field: update_st_bonus(f)
+        )
+
+st.markdown("---")
+
+# =================================================================
+# 5. エクスポート/インポート機能 (in / out)
 # =================================================================
 
 st.subheader("mysetno (エクスポート/インポート)")
@@ -381,15 +472,16 @@ export_data = {
     "sub_class": st.session_state['sub_class_select'],
     "skills": st.session_state['skills_data'], 
     
-    # 基礎値は固定になったため、エクスポート対象から削除しました。
-
     "race": st.session_state['race_select'],
     "mag_stats": st.session_state['mag_stats'], 
     
     # クラスブースト設定値
     "class_boost_enabled": st.session_state['class_boost_enabled'],
     
-    "version": "pso2_dmg_calc_v5_fixed_base_stats"
+    # スキルツリー固定値（入力値）をエクスポート
+    "st_fixed_bonus": st.session_state['st_fixed_bonus'], 
+
+    "version": "pso2_dmg_calc_v6_strict_floor"
 }
 
 export_json = json.dumps(export_data, indent=4, ensure_ascii=False)
@@ -417,20 +509,26 @@ if uploaded_file is not None:
             st.session_state['sub_class_select'] = data["sub_class"]
             st.session_state['skills_data'] = data["skills"]
             
-            # 基礎ステータス値のインポートは削除されました。
-
             if "race" in data:
                 st.session_state['race_select'] = data["race"]
             if "mag_stats" in data:
                 st.session_state['mag_stats'] = data["mag_stats"]
                 for field, value in data["mag_stats"].items():
-                    # st.number_input の値を更新するためにセッションステートに再代入
                     if f"mag_input_{field}" in st.session_state:
                          st.session_state[f"mag_input_{field}"] = value
                          
             # クラスブーストのインポート
             if "class_boost_enabled" in data:
                 st.session_state['class_boost_enabled'] = data["class_boost_enabled"]
+
+            # スキルツリー固定値のインポート (新しい項目)
+            if "st_fixed_bonus" in data:
+                 st.session_state['st_fixed_bonus'] = data["st_fixed_bonus"]
+                 # UIの更新
+                 for field, value in data["st_fixed_bonus"].items():
+                    if f"st_bonus_input_{field}" in st.session_state:
+                        st.session_state[f"st_bonus_input_{field}"] = value
+                         
 
             st.success(f"設定をインポートしました。")
             st.rerun() 
@@ -444,7 +542,7 @@ if uploaded_file is not None:
 st.markdown("---")
 
 # =================================================================
-# 5. スキルツリー詳細設定
+# 6. スキルツリー詳細設定
 # =================================================================
 
 st.subheader("スキルツリー詳細設定")
