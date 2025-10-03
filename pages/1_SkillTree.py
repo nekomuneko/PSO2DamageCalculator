@@ -1,44 +1,36 @@
-# pages/1_Skill_Tree.py の冒頭部分を修正
+# pages/1_SkillTree.py
 
 import streamlit as st
 import json
 import base64
-import os  # 追加
-from pathlib import Path # 追加
+# import os # 削除
+# from pathlib import Path # 削除
 
 st.set_page_config(layout="wide")
 
 # --- ファイルパスの基点を設定 ---
-# 1. 現在のスクリプトの絶対パスを取得
-SCRIPT_DIR = Path(__file__).parent.resolve()
-
-# 2. imagesフォルダがあるプロジェクトルートパスを特定
-#    pages/1_SkillTree.py から見て、親ディレクトリ (pages) の親ディレクトリ (ルート) を指定
-PROJECT_ROOT = SCRIPT_DIR.parent.resolve() 
-
-def get_image_path(class_name):
-    # プロジェクトルートから images フォルダ内の画像ファイルまでの絶対パスを構築
-    # ※あなたの最新のファイル構造 images/Hu.png を想定しています
-    return str(PROJECT_ROOT / "images" / f"{class_name}.png")
+# 絶対パス構築ロジックをすべて削除
 
 # -------------------------------------------------------------------
-# クラス名と画像ファイルパスの対応付け
+# クラス名と画像ファイルパスの対応付け (相対パスに復帰)
 # -------------------------------------------------------------------
 CLASS_IMAGES = {
-    "Hu": get_image_path("Hu"), 
-    "Fi": get_image_path("Fi"),
-    "Ra": get_image_path("Ra"),
-    "Gu": get_image_path("Gu"),
-    "Fo": get_image_path("Fo"),
-    "Te": get_image_path("Te"),
-    "Br": get_image_path("Br"),
-    "Bo": get_image_path("Bo"),
-    "Su": get_image_path("Su"),
-    "Hr": get_image_path("Hr"),
-    "Ph": get_image_path("Ph"),
-    "Et": get_image_path("Et"),
-    "Lu": get_image_path("Lu"),
+    # すべてのクラスのパスを "images/クラス名.png" の形式に戻す
+    "Hu": "images/Hu.png", 
+    "Fi": "images/Fi.png",
+    "Ra": "images/Ra.png",
+    "Gu": "images/Gu.png",
+    "Fo": "images/Fo.png",
+    "Te": "images/Te.png",
+    "Br": "images/Br.png",
+    "Bo": "images/Bo.png",
+    "Su": "images/Su.png",
+    "Hr": "images/Hr.png",
+    "Ph": "images/Ph.png",
+    "Et": "images/Et.png",
+    "Lu": "images/Lu.png",
 }
+
 # -------------------------------------------------------------------
 
 # 全てのクラス定義
@@ -172,4 +164,5 @@ with tab1:
 
 with tab2:
     st.subheader("スキルツリー詳細設定")
+
     st.write("スキル配分などの設定は、ここに追加されます。")
