@@ -8,6 +8,7 @@ st.set_page_config(layout="wide")
 # =================================================================
 
 # --- Lv100メインクラス補正済み基礎値 ---
+# このセクションはステータス計算の基礎値であり、変更していません。
 WIKI_BASE_STATS = {
     "Hu": {"HP": 764, "PP": 120, "打撃力": 580, "射撃力": 540, "法撃力": 451, "技量": 415, "打撃防御": 580, "射撃防御": 451, "法撃防御": 451},
     "Fi": {"HP": 655, "PP": 120, "打撃力": 580, "射撃力": 450, "法撃力": 540, "技量": 415, "打撃防御": 580, "射撃防御": 450, "法撃防御": 450},
@@ -49,110 +50,59 @@ CLASS_BOOST_BONUS = {
 # --- HPアップ系スキルボーナス値の定義 ---
 # レベルをキー、ボーナスHPを値とする
 HP_UP_BONUSES = {
+    # ユーザー提供データに基づいて正確に定義
     "HPアップ 1": {1: 3, 2: 6, 3: 10, 4: 14, 5: 18, 6: 23, 7: 28, 8: 34, 9: 40, 10: 50},
     "HPアップ 2": {1: 4, 2: 9, 3: 14, 4: 19, 5: 25, 6: 31, 7: 39, 8: 50, 9: 62, 10: 75}, # Hu 限定
     "HPアップ 3": {1: 5, 2: 11, 3: 18, 4: 26, 5: 35, 6: 45, 7: 56, 8: 68, 9: 81, 10: 100}, # Hu 限定
     "HPアップ (Su)": {1: 20, 2: 25, 3: 30, 4: 35, 5: 50}, # Su 限定
     "HPハイアップ": {1: 20, 2: 25, 3: 30, 4: 35, 5: 50, 6: 60, 7: 70, 8: 80, 9: 90, 10: 100}, # Su 限定
-    # 【NEW】後継クラス (Hr/Ph/Et/Lu) 共通のHPアップボーナス
-    "HPアップ (後継)": {1: 5, 2: 10, 3: 15, 4: 20, 5: 25, 6: 30, 7: 35, 8: 40, 9: 45, 10: 50}, 
+    "HPアップ (後継)": {1: 5, 2: 10, 3: 15, 4: 20, 5: 25, 6: 30, 7: 35, 8: 40, 9: 45, 10: 50}, # Hr/Ph/Et/Lu 共通
 }
 
-# クラス名 -> {スキル名: {"max_level": X, "description": "説明", "prereq": {"前提スキル名": 必須SP}}}
+# --- スキルツリーのデータ定義（HPアップ系のみに絞り込み） ---
 ALL_SKILL_DATA = {
     "Hu": {
-        "フューリースタンス": {"max_level": 10, "description": "打撃力と射撃力を上昇。", "prereq": None},
-        "フューリーSアップ": {"max_level": 10, "description": "フューリースタンス中の威力上昇効果をさらに強化。", "prereq": {"フューリースタンス": 1}},
-        "オートメイトハーフ": {"max_level": 1, "description": "HPが半分以下になると自動でHP回復。", "prereq": None},
-        "アイアンウィル": {"max_level": 1, "description": "戦闘不能になるダメージを受けてもHP1で耐える。", "prereq": None},
-        "乙女の意地": {"max_level": 1, "description": "アイアンウィル発動時にPPを回復。", "prereq": {"アイアンウィル": 1}},
-        "ウォーブレイカー": {"max_level": 5, "description": "敵のガードを崩しやすくする。", "prereq": None},
-        "打撃力アップ": {"max_level": 10, "description": "打撃力を上昇させる。", "prereq": None},
-        "PPアップ": {"max_level": 10, "description": "最大PPを上昇させる。", "prereq": None},
         "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1のボーナス)。", "prereq": None},
         "HPアップ 2": {"max_level": 10, "description": "最大HPを上昇させる (Hu限定のHPアップ 2のボーナス)。", "prereq": None},
         "HPアップ 3": {"max_level": 10, "description": "最大HPを上昇させる (Hu限定のHPアップ 3のボーナス)。", "prereq": None}, 
     },
     "Fi": {
-        "リミットブレイク": {"max_level": 1, "description": "HPを犠牲に攻撃能力を大幅強化。", "prereq": None},
-        "テックアーツJAボーナス": {"max_level": 10, "description": "異なるPA/テクニックを続けて使用すると威力上昇。", "prereq": None},
-        "チェイスアドバンス": {"max_level": 10, "description": "状態異常のエネミーへのダメージ増加。", "prereq": None},
-        "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1のボーナス)。", "prereq": None},
-        "HPアップ 1（2）": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1と同一の効果)。", "prereq": None}, 
-        "PPスレイヤー": {"max_level": 10, "description": "PP量が少ないほど威力上昇。", "prereq": None},
+        "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1と同一の効果)。", "prereq": None}, 
     },
     "Ra": {
-        "ウィークスタンス": {"max_level": 10, "description": "弱点部位へのダメージを増加。", "prereq": None},
-        "ウィークSアップ": {"max_level": 10, "description": "ウィークスタンス中の効果をさらに強化。", "prereq": {"ウィークスタンス": 1}},
-        "スタンディングSチャージ": {"max_level": 1, "description": "静止中にチャージ時間が短縮。", "prereq": None},
-        "キリングボーナス": {"max_level": 5, "description": "エネミー撃破時にPPを回復。", "prereq": None},
-        "射撃力アップ": {"max_level": 10, "description": "射撃力を上昇させる。", "prereq": None},
-        "トラップサーチ": {"max_level": 1, "description": "トラップの場所をミニマップに表示。", "prereq": None},
+        "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1のボーナス)。", "prereq": None},
     },
     "Gu": {
-        "SロールJAボーナス": {"max_level": 10, "description": "スタイリッシュロール後のJAで威力上昇。", "prereq": None},
-        "TマシンガンアーツSチャージ": {"max_level": 1, "description": "Tマシンガンのチャージ時間が短縮。", "prereq": None},
-        "アタックPPリカバリー": {"max_level": 10, "description": "通常攻撃のPP回復量を上昇。", "prereq": None},
-        "パーフェクトキーパー": {"max_level": 10, "description": "HPが満タンに近いほど威力上昇。", "prereq": None},
-        "PPハイアップ": {"max_level": 10, "description": "PP最大値を大幅に上昇。", "prereq": None},
         "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1のボーナス)。", "prereq": None},
     },
     "Fo": {
-        "テックチャージアドバンス": {"max_level": 10, "description": "テクニックのチャージ時間を短縮。", "prereq": None},
-        "ロッドシュート": {"max_level": 5, "description": "ロッドでの通常攻撃が長射程になる。", "prereq": None},
-        "法撃力アップ": {"max_level": 10, "description": "法撃力を上昇させる。", "prereq": None},
-        "エレメントコンバージョン": {"max_level": 10, "description": "属性一致時のダメージを増加。", "prereq": None},
-        "チャージPPリバイバル": {"max_level": 1, "description": "テクニックチャージ中にPP回復速度が上昇。", "prereq": None},
         "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1のボーナス)。", "prereq": None},
     },
     "Te": {
-        "テリトリーバースト": {"max_level": 1, "description": "シフタ・デバンドの効果範囲拡大。", "prereq": None},
-        "シフタ・デバンドアドバンス": {"max_level": 10, "description": "シフタ・デバンドの効果上昇。", "prereq": None},
-        "エレメントウィークヒット": {"max_level": 10, "description": "弱点属性へのダメージを増加。", "prereq": None},
-        "ライトマスタリー": {"max_level": 10, "description": "光属性テクニックの威力上昇。", "prereq": None},
-        "ウィンドマスタリー": {"max_level": 10, "description": "風属性テクニックの威力上昇。", "prereq": None},
+        "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1のボーナス)。", "prereq": None},
     },
     "Br": {
-        "アベレージスタンス": {"max_level": 10, "description": "常に安定したダメージを与える。", "prereq": None},
-        "カタナコンバット": {"max_level": 1, "description": "一定時間、攻撃速度と威力を強化。", "prereq": None},
-        "バレットボウチャージボーナス": {"max_level": 1, "description": "バレットボウのチャージ攻撃の威力上昇。", "prereq": None},
+        "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1のボーナス)。", "prereq": None},
     },
     "Bo": {
-        "ブレードディスラプター": {"max_level": 10, "description": "ジェットブーツのPAが連続ヒットするように。", "prereq": None},
-        "ブレイクスタンス": {"max_level": 10, "description": "部位破壊時や特定の部位へのダメージ増加。", "prereq": None},
-        "フォトンブレードフィーバー": {"max_level": 1, "description": "一定時間、フォトンブレードを連続射出。", "prereq": None},
+        "HPアップ 1": {"max_level": 10, "description": "最大HPを上昇させる (HPアップ 1のボーナス)。", "prereq": None},
     },
     "Su": {
-        "マッシブハンター": {"max_level": 1, "description": "スーパーアーマーとダメージ耐性を獲得。", "prereq": None},
-        "シフタライド": {"max_level": 10, "description": "シフタライド後の威力上昇。", "prereq": None},
-        "パフェスタンス": {"max_level": 10, "description": "ペットの攻撃力上昇。", "prereq": None},
         "HPアップ (Su)": {"max_level": 5, "description": "最大HPを上昇させる (Su専用のHPアップボーナス)。", "prereq": None}, 
-        "HPハイアップ": {"max_level": 10, "description": "最大HPを大きく上昇させる。", "prereq": None}, # <- Lv10まで反映済み
+        "HPハイアップ": {"max_level": 10, "description": "最大HPを大きく上昇させる。", "prereq": None},
     },
     # 後継クラス (サブクラス不可)
     "Hr": {
-        "ヒーローウィル": {"max_level": 1, "description": "戦闘不能になるダメージを受けてもHP1で耐える。", "prereq": None},
-        "ヒーローブースト": {"max_level": 10, "description": "連続して攻撃を当てると威力上昇。", "prereq": None},
-        "ヒーロータイム": {"max_level": 1, "description": "一定時間、攻撃能力と機動力を大幅に強化。", "prereq": None},
-        "HPアップ (後継)": {"max_level": 10, "description": "最大HPを上昇させる (後継クラス専用ボーナス)。", "prereq": None}, # <- NEW
+        "HPアップ (後継)": {"max_level": 10, "description": "最大HPを上昇させる (後継クラス専用ボーナス)。", "prereq": None},
     },
     "Ph": {
-        "ファントムPPメイトリバイブ": {"max_level": 1, "description": "PPメイト使用時にHPも回復。", "prereq": None},
-        "ファントムマーカー": {"max_level": 10, "description": "マーカーを付与し、爆発でダメージを与える。", "prereq": None},
-        "ファントムタイム": {"max_level": 1, "description": "一定時間、攻撃能力を強化。", "prereq": None},
-        "HPアップ (後継)": {"max_level": 10, "description": "最大HPを上昇させる (後継クラス専用ボーナス)。", "prereq": None}, # <- NEW
+        "HPアップ (後継)": {"max_level": 10, "description": "最大HPを上昇させる (後継クラス専用ボーナス)。", "prereq": None},
     },
     "Et": {
-        "エトワールウィル": {"max_level": 1, "description": "戦闘不能になるダメージを受けてもHP1で耐える。", "prereq": None},
-        "オールアタックボーナス": {"max_level": 10, "description": "全ての攻撃種別でダメージ上昇。", "prereq": None},
-        "エトワールブースト": {"max_level": 1, "description": "状態異常を無効化し、被ダメージを軽減。", "prereq": None},
-        "HPアップ (後継)": {"max_level": 10, "description": "最大HPを上昇させる (後継クラス専用ボーナス)。", "prereq": None}, # <- NEW
+        "HPアップ (後継)": {"max_level": 10, "description": "最大HPを上昇させる (後継クラス専用ボーナス)。", "prereq": None},
     },
     "Lu": {
-        "ルミナスリフレクト": {"max_level": 1, "description": "自動でガードし、PPを回復。", "prereq": None},
-        "ルミナスマスタリー": {"max_level": 10, "description": "全ての攻撃種別でダメージ上昇。", "prereq": None},
-        "ライトニングスピア": {"max_level": 1, "description": "範囲内の敵にダメージを与え、PPを回復。", "prereq": None},
-        "HPアップ (後継)": {"max_level": 10, "description": "最大HPを上昇させる (後継クラス専用ボーナス)。", "prereq": None}, # <- NEW
+        "HPアップ (後継)": {"max_level": 10, "description": "最大HPを上昇させる (後継クラス専用ボーナス)。", "prereq": None},
     },
 }
 
@@ -183,15 +133,12 @@ if 'mag_stats' not in st.session_state:
     st.session_state['mag_stats'] = {field: 200 if field == "射撃力" else 0 for field in MAG_STATS_FIELDS}
 if 'class_boost_enabled' not in st.session_state: st.session_state['class_boost_enabled'] = True 
 
-# スキルツリー関連の初期化
+# スキルレベル割り当ての初期化 (SP概念はなし)
 if 'all_sp_allocations' not in st.session_state:
     st.session_state['all_sp_allocations'] = {
         class_name: {skill: 0 for skill in skills.keys()}
         for class_name, skills in ALL_SKILL_DATA.items()
     }
-# 利用可能SPは共通
-if 'total_sp_available' not in st.session_state:
-    st.session_state['total_sp_available'] = 70 
 
 # =================================================================
 # 4. 計算関数（ステータス計算用）
@@ -225,9 +172,9 @@ def get_calculated_stats():
             if level > 0:
                 # HPボーナスを持つスキルのキー名を決定
                 key_name = None
-                if skill_name in ["HPアップ 2", "HPアップ 3", "HPアップ (Su)", "HPハイアップ", "HPアップ (後継)"]: # <-- 後継クラスのスキルを追加
+                if skill_name in ["HPアップ 2", "HPアップ 3", "HPアップ (Su)", "HPハイアップ", "HPアップ (後継)"]:
                     key_name = skill_name
-                elif skill_name in ["HPアップ 1", "HPアップ 1（2）"]:
+                elif skill_name in ["HPアップ 1"]:
                     key_name = "HPアップ 1"
 
                 if key_name and key_name in HP_UP_BONUSES:
@@ -476,74 +423,10 @@ st.markdown("---")
 # 5-2. スキルツリーシミュレーター UI (統合部分)
 # -----------------------------------------------------------------
 
-st.header("2. スキルツリーシミュレーター")
+st.header("2. スキルツリーシミュレーター (HPアップ系のみ)")
+st.caption("※ スキルポイント（SP）の概念は削除されています。各スキルを自由にLv設定できます。")
 
-# --- A. SP設定とサマリー ---
-
-# 現在の合計SPの計算
-main_allocations = st.session_state['all_sp_allocations'].get(main_class, {})
-# サブクラスの名称を取得 (Noneの場合もそのままキーとして利用)
-sub_class_name_key = st.session_state.get('sub_class_select', 'None')
-sub_allocations = st.session_state['all_sp_allocations'].get(sub_class_name_key, {})
-
-
-total_sp_spent = sum(main_allocations.values())
-sub_tab_enabled = sub_class_name_key != 'None' and sub_class_name_key in ALL_SKILL_DATA # スキルデータがあるかもチェック
-
-if sub_tab_enabled:
-    total_sp_spent += sum(sub_allocations.values()) # サブクラスのSPを加算
-
-total_sp_available = st.session_state['total_sp_available']
-remaining_sp = total_sp_available - total_sp_spent
-
-st.markdown("### 🛠️ SP設定とサマリー")
-col_sp_input, col_sp_summary, col_sp_remaining = st.columns(3)
-
-with col_sp_input:
-    st.number_input(
-        "利用可能な合計SP",
-        min_value=1,
-        max_value=150, 
-        value=total_sp_available,
-        step=1,
-        key='total_sp_available',
-        label_visibility="visible",
-        help="メインクラスとサブクラスで合計して使用できるSPの最大値です。"
-    )
-
-with col_sp_summary:
-    st.metric(
-        label="使用済み SP (合計)",
-        value=f"{total_sp_spent} ポイント",
-        delta_color="off" 
-    )
-
-with col_sp_remaining:
-    delta_value = None
-    delta_color = "off"
-    if remaining_sp > 0:
-        delta_value = f"残り {remaining_sp}"
-        delta_color = "inverse"
-    elif remaining_sp < 0:
-        delta_value = f"超過 {abs(remaining_sp)}"
-        delta_color = "normal" 
-
-    st.metric(
-        label="SP ステータス",
-        value=f"{remaining_sp} ポイント",
-        delta=delta_value, 
-        delta_color=delta_color 
-    )
-
-if remaining_sp < 0:
-    st.error(f"合計SP ({total_sp_available}) を {abs(remaining_sp)} ポイント超過しています！")
-elif remaining_sp == 0:
-    st.success("スキルポイントを使い切りました！")
-
-
-st.markdown("---")
-
-# --- B. スキル配分エリア (st.tabsを使用) ---
+# --- スキル配分エリア (st.tabsを使用) ---
 
 # スキル入力のロジック
 def update_allocation(class_name, skill_name):
@@ -553,11 +436,15 @@ def update_allocation(class_name, skill_name):
 
 
 # メインクラスのタブ名
-main_tab_title = f"メイン: {main_class} ({sum(main_allocations.values())} SP)"
+main_allocations = st.session_state['all_sp_allocations'].get(main_class, {})
+main_tab_title = f"メイン: {main_class}"
 
 # サブクラスのタブ名
-sub_class_name_key = sub_class_name_key if sub_class_name_key != 'None' else "None"
-sub_tab_title = f"サブ: {sub_class_name_key} ({sum(sub_allocations.values())} SP)" if sub_tab_enabled else f"サブ: {sub_class_name_key}"
+sub_class_name_key = st.session_state.get('sub_class_select', 'None')
+sub_allocations = st.session_state['all_sp_allocations'].get(sub_class_name_key, {})
+sub_tab_enabled = sub_class_name_key != 'None' and sub_class_name_key in ALL_SKILL_DATA # スキルデータがあるかもチェック
+
+sub_tab_title = f"サブ: {sub_class_name_key}"
 
 
 tab_main, tab_sub = st.tabs([main_tab_title, sub_tab_title])
@@ -566,10 +453,10 @@ tab_main, tab_sub = st.tabs([main_tab_title, sub_tab_title])
 def render_skill_tree(class_name, allocations):
     current_skills = ALL_SKILL_DATA.get(class_name, {})
     if not current_skills:
-        st.info("このクラスのスキルデータは現在準備されていません。")
+        st.info("このクラスのHPアップスキルは現在定義されていません。")
         return
 
-    st.markdown(f"#### {class_name} スキルポイント配分")
+    st.markdown(f"#### {class_name} スキルレベル設定")
     
     # スキルを2列に分けて表示
     skill_cols = st.columns(2)
@@ -586,7 +473,7 @@ def render_skill_tree(class_name, allocations):
             current_lvl = allocations.get(skill_name, 0)
             
             # スキル名と説明をコンパクトに表示
-            st.markdown(f"**{skill_name}** (Max Lvl: {max_lvl})")
+            st.markdown(f"**{skill_name}** (最大Lv: {max_lvl})")
             st.caption(f"*{skill_info['description']}*")
 
             # ナンバーインプットを使用。キーにクラス名とスキル名を追加
@@ -615,7 +502,7 @@ with tab_sub:
 
 
 st.markdown("---")
-st.markdown("### 📊 HP アップスキルボーナス一覧 (参考)")
+st.markdown("### 📊 HP アップスキルボーナス一覧 (値の編集はこちら)")
 
 hp_cols = st.columns(4)
 
@@ -630,6 +517,9 @@ def render_hp_bonus_table(key, title, col):
 
 
 render_hp_bonus_table("HPアップ 1", "HPアップ 1 (共通)", hp_cols[0])
-render_hp_bonus_table("HPアップ (Su)", "HPアップ (Su)", hp_cols[1])
-render_hp_bonus_table("HPハイアップ", "HPハイアップ (Su)", hp_cols[2])
-render_hp_bonus_table("HPアップ (後継)", "HPアップ (後継)", hp_cols[3])
+render_hp_bonus_table("HPアップ 2", "HPアップ 2 (Hu)", hp_cols[1])
+render_hp_bonus_table("HPアップ 3", "HPアップ 3 (Hu)", hp_cols[2])
+render_hp_bonus_table("HPアップ (後継)", "HPアップ (Hr/Ph/Et/Lu)", hp_cols[3])
+st.markdown("---")
+render_hp_bonus_table("HPアップ (Su)", "HPアップ (Su)", hp_cols[0])
+render_hp_bonus_table("HPハイアップ", "HPハイアップ (Su)", hp_cols[1])
