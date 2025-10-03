@@ -1,10 +1,3 @@
-承知いたしました。ご指示に従い、KeyError を防ぐためのセッションステート初期化ロジックを追加したうえで、現在の要件をすべて満たす pages/1_SkillTree.py の全コードを書き直して提示します。
-
-このコードは、画像パスのエラーを避けるための相対パスと、st.image() のフォールバックに空文字列を使わない修正も含んでいます。
-
-💻 pages/1_SkillTree.py スクリプト (最終修正版)
-Python
-
 # pages/1_SkillTree.py
 
 import streamlit as st
@@ -156,4 +149,5 @@ with tab1:
 with tab2:
     st.subheader("スキルツリー詳細設定")
     st.write("スキル配分などの詳細設定をここに追加します。")
+
 
