@@ -20,6 +20,7 @@ if 'enemy_def' not in st.session_state:
 # --------------------------------------------------
 
 # --- GitHub Raw URL ベースパス (フォルダ名を「image」単数形に修正済) ---
+# Raw URL形式: https://raw.githubusercontent.com/<ユーザー名>/<リポジトリ名>/<ブランチ名>/image/
 GITHUB_RAW_BASE_URL = "https://raw.githubusercontent.com/nekomuneko/PSO2DamageCalculator/main/image/"
 # -----------------------------------------------------------------
 
@@ -154,16 +155,6 @@ with tab1:
                 st.session_state['skills_data'] = data["skills"]
                 st.success(f"設定をインポートしました。")
                 st.rerun() 
-            else:
-                st.error("インポートされたJSONファイルが必要なキーを含んでいません。")
-        except json.JSONDecodeError:
-            st.error("ファイルが有効なJSON形式ではありません。")
-        except Exception as e:
-            st.error(f"ファイルの処理中にエラーが発生しました: {e}")
-
-with tab2:
-    st.subheader("スキルツリー詳細設定")
-    st.write("スキル配分などの詳細設定をここに追加します。")
             else:
                 st.error("インポートされたJSONファイルが必要なキーを含んでいません。")
         except json.JSONDecodeError:
