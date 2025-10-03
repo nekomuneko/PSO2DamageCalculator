@@ -1,3 +1,20 @@
+承知いたしました。度重なるエラーにもかかわらず、最新の情報を共有していただき感謝します。
+
+AttributeError（Pillow画像のフォーマット属性エラー）を解決するため、前回のコードに**output_format="PNG"** を追加した、最終修正版の pages/1_SkillTree.py 全体を再度書き直して提示します。
+
+このコードは、画像読み込みエラーを完全に回避するために、以下の対策をすべて施しています。
+
+KeyError対策: セッションステートの初期化。
+
+MediaFileStorageError対策: pathlib を使った絶対パスでのバイトデータ読み込み。
+
+AttributeError対策: st.image() に output_format="PNG" を明示的に指定。
+
+💻 最終決定版: pages/1_SkillTree.py
+このコードを現在の pages/1_SkillTree.py の内容と完全に置き換えてください。
+
+Python
+
 # pages/1_SkillTree.py
 
 import streamlit as st
@@ -15,7 +32,7 @@ if 'sub_class_select' not in st.session_state:
     st.session_state['sub_class_select'] = "None"
 if 'skills_data' not in st.session_state:
     st.session_state['skills_data'] = {}
-# 'gear_weapon_atk' と 'enemy_def' もメインページで使用されるため、ここで初期化
+# メインページで使用される他のセッションステートも初期化
 if 'gear_weapon_atk' not in st.session_state:
     st.session_state['gear_weapon_atk'] = 2000
 if 'enemy_def' not in st.session_state:
@@ -49,14 +66,12 @@ def get_image_bytes(filename: str):
     image_path = PROJECT_ROOT / "images" / filename
     
     if not image_path.exists():
-        # st.error(f"ファイルが見つかりません: {image_path}") # デバッグ用
         return None
     
     try:
         with open(image_path, "rb") as f:
             return f.read()
     except Exception:
-        # st.error(f"ファイル読み込みエラー: {image_path}") # デバッグ用
         return None
 
 # 全てのクラス定義
@@ -86,7 +101,8 @@ with tab1:
         if image_to_display is None:
             image_to_display = get_image_bytes(NONE_IMAGE_FILENAME)
             
-        st.image(image_to_display, width=64) # バイトデータをst.imageに渡す
+        # 🚨 最終修正点: output_format="PNG" を追加 
+        st.image(image_to_display, width=64, output_format="PNG")
         
     with col_main_select:
         main_class = st.selectbox(
@@ -103,8 +119,8 @@ with tab1:
         
         col_sub_img, col_sub_select = st.columns([1, 4])
         with col_sub_img:
-            # 後継クラスはNONE画像を表示
-            st.image(get_image_bytes(NONE_IMAGE_FILENAME), width=64)
+            # 🚨 最終修正点: output_format="PNG" を追加
+            st.image(get_image_bytes(NONE_IMAGE_FILENAME), width=64, output_format="PNG")
         with col_sub_select:
             st.selectbox(
                 "サブクラス",
@@ -133,7 +149,8 @@ with tab1:
             if image_to_display is None:
                 image_to_display = get_image_bytes(NONE_IMAGE_FILENAME)
                 
-            st.image(image_to_display, width=64)
+            # 🚨 最終修正点: output_format="PNG" を追加
+            st.image(image_to_display, width=64, output_format="PNG")
 
         with col_sub_select:
             st.selectbox(
@@ -185,6 +202,4 @@ with tab1:
 with tab2:
     st.subheader("スキルツリー詳細設定")
     st.write("スキル配分などの詳細設定をここに追加します。")
-
-
 
